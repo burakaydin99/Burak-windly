@@ -719,11 +719,11 @@
     h += '</tbody></table>';
     fc.innerHTML = h;
 
-    // Şimdiki / odaktaki saati görünür yap
-    const th = fc.querySelector(`thead th[data-i="${focusIdx}"]`);
+    // Tablo 08:00'den başlasın (saatlik görünümde 08–17 tek ekranda görünür)
+    const startIdx = rows.findIndex(r => r.p.h >= 8);
+    const th = fc.querySelector(`thead th[data-i="${Math.max(startIdx, 0)}"]`);
     const lblW = fc.querySelector('.lbl').offsetWidth;
-    if (th && th.offsetLeft + th.offsetWidth > fc.clientWidth) fc.scrollLeft = th.offsetLeft - lblW - th.offsetWidth;
-    else fc.scrollLeft = 0;
+    fc.scrollLeft = th ? th.offsetLeft - lblW : 0;
 
     // Bir saate dokununca pusula ve harita işaretleri o saati göstersin
     fc.querySelector('table').addEventListener('click', e => {
