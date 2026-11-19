@@ -824,12 +824,9 @@
     // Motor modu
     const syncMotor = () => {
       syncSeg('motorSeg', state.motor ? 'on' : 'off');
-      $('#motorBtn').classList.toggle('active', state.motor);
-      $('#motorBtn').setAttribute('aria-pressed', state.motor);
       $('#mWarn').value = state.motorWarn; $('#mRisk').value = state.motorRisk;
     };
     const setMotor = on => { state.motor = on; store.set('motor', on); syncMotor(); load(); };
-    $('#motorBtn').addEventListener('click', () => setMotor(!state.motor));
     $('#motorSeg').addEventListener('click', e => { const v = e.target.dataset.v; if (v) setMotor(v === 'on'); });
     ['mWarn', 'mRisk'].forEach(id => $('#' + id).addEventListener('change', () => {
       const w = +$('#mWarn').value, r = +$('#mRisk').value;
