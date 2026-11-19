@@ -11,7 +11,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="css/style.css?v=19">
+  <link rel="stylesheet" href="css/style.css?v=21">
 </head>
 <body>
   <!-- Üst satır: kayıtlı bölgeler + yenile + ayarlar -->
@@ -26,7 +26,7 @@
     </button>
   </header>
 
-  <!-- Harita + rüzgar pusulası -->
+  <!-- Harita -->
   <section class="mapwrap" id="mapWrap">
     <div id="map"></div>
     <button class="map-btn" id="layerBtn" title="Harita görünümü" aria-label="Harita görünümü">
@@ -44,13 +44,7 @@
     </div>
   </section>
 
-  <!-- Model seçimi -->
-  <div class="modelbar">
-    <div class="models" id="modelTabs"></div>
-    <span class="source" id="sourceTag"></span>
-  </div>
-
-  <!-- Gün şeridi -->
+  <!-- Gün seçimi (haritanın altında) -->
   <div class="daynav" id="dayNav">
     <button class="nav-btn" id="prevDay" aria-label="Önceki gün">
       <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -61,10 +55,18 @@
     </button>
   </div>
 
+  <!-- Model seçimi -->
+  <div class="modelbar">
+    <div class="models" id="modelTabs"></div>
+  </div>
+
   <!-- Saatlik tablo (yana kaydırmalı) -->
   <main class="forecast" id="forecast">
     <div class="status" id="status">Bölge seç veya ekle…</div>
   </main>
+
+  <!-- Veri kaynağı ve güncelleme saati -->
+  <footer class="srcbar"><span class="source" id="sourceTag"></span></footer>
 
   <!-- Bölge ekleme -->
   <dialog id="addDlg" class="sheet">
@@ -159,6 +161,6 @@
   </dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="js/app.js?v=19"></script>
+  <script src="js/app.js?v=21"></script>
 </body>
 </html>

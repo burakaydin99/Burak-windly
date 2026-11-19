@@ -516,11 +516,11 @@
     bar.innerHTML = '';
     for (const l of state.locs) {
       const b = el('button', { class: 'chip' + (l.id === state.sel ? ' active' : ''), 'data-id': l.id });
-      b.innerHTML = `${esc(l.name)}<span class="w" hidden></span>`;
+      b.textContent = l.name;
       b.addEventListener('click', () => selectLoc(l.id));
       bar.append(b);
     }
-    bar.append(el('button', { class: 'chip add', onclick: openAdd }, '＋ Ekle'));
+    bar.append(el('button', { class: 'chip add', onclick: openAdd, title: 'Bölge ekle', 'aria-label': 'Bölge ekle' }, '+'));
     bar.querySelector('.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
     paintBadges();
   }
@@ -535,8 +535,6 @@
     const t = state.focusT ?? Date.now();
     for (const l of state.locs) {
       l._r = l._data?.hours?.length ? nearest(l._data.hours, t) : null;
-      const s = document.querySelector(`.chip[data-id="${CSS.escape(l.id)}"] .w`);
-      if (s && l._r) { s.hidden = false; s.textContent = windVal(l._r.ws); s.style.background = windColor(l._r.ws); }
     }
     renderMarkers();
   }
@@ -637,15 +635,13 @@
     const p = day.rows[0].p;
     const now = Date.now();
     const isToday = p.key === tparts(now, loc.tz).key;
-    const we = p.wd === 'Sat' || p.wd === 'Sun';
     const sun = sunTimes(Date.UTC(p.y, p.mo - 1, p.d, 12), loc.lat, loc.lon);
     const maxWs = Math.max(...day.rows.map(r => r.ws ?? 0));
     const shortDay = { Mon: 'Pzt', Tue: 'Sal', Wed: 'Çar', Thu: 'Per', Fri: 'Cum', Sat: 'Cmt', Sun: 'Paz' };
     const maxWg = Math.max(...day.rows.map(r => r.wg ?? 0));
     const rain = day.rows.reduce((s, r) => s + (r.precip || 0), 0);
     $('#dayInfo').innerHTML =
-      `<span class="t${we ? ' we' : ''}">${shortDay[p.wd] || p.wd} ${p.d} ${TR_MON[p.mo - 1]}</span>` +
-      (isToday ? '<span class="today">BUGÜN</span>' : '') +
+      `<span class="t${isToday ? ' is-today' : ''}"${isToday ? ' title="Bugün"' : ''}>${shortDay[p.wd] || p.wd} ${p.d} ${TR_MON[p.mo - 1]}</span>` +
       `<span><b style="background:${windColor(maxWs)}">${windVal(maxWs)}</b>/<b style="background:${windColor(maxWg)}">${windVal(maxWg)}</b></span>` +
       (rain >= 0.1 && !state.motor ? `<span class="m">💧${rain.toFixed(1)}</span>` : '') +
       (state.motor ? rideSummary(day.rows) : sun ? `<span class="m">☀${hhmm(sun.rise, loc.tz)}–${hhmm(sun.set, loc.tz)}</span>` : '');
