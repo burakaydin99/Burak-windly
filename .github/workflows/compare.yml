@@ -1,0 +1,25 @@
+name: Karşılaştırma (Infoplaza vs Open-Meteo)
+# Elle çalıştırılır; sonuç işin kaydında (log) görünür, hiçbir şey commit edilmez.
+on:
+  workflow_dispatch:
+    inputs:
+      bolge:
+        description: Bölge adı (boş = ilk bölge)
+        required: false
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node src/scripts/compare.mjs site "${{ inputs.bolge }}"
