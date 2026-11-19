@@ -638,15 +638,17 @@
     const shortDay = { Mon: 'Pzt', Tue: 'Sal', Wed: 'Çar', Thu: 'Per', Fri: 'Cum', Sat: 'Cmt', Sun: 'Paz' };
     const maxWg = Math.max(...day.rows.map(r => r.wg ?? 0));
     const rain = day.rows.reduce((s, r) => s + (r.precip || 0), 0);
+    const pps = day.rows.map(r => r.pp).filter(v => v != null);
+    const ppMax = pps.length ? Math.round(Math.max(...pps)) : null;
     const temps = day.rows.map(r => r.temp).filter(t => t != null);
     const tMin = temps.length ? Math.round(Math.min(...temps)) : null, tMax = temps.length ? Math.round(Math.max(...temps)) : null;
     // Tek dikdörtgen, iki renge bölünmüş; ortada ince beyaz dikey çizgi
     const pair = (l, lc, r, rc, title, cls = '') => `<span class="dbox${cls}" title="${title}"><b style="background:${lc}">${l}</b><b style="background:${rc}">${r}</b></span>`;
     $('#dayInfo').innerHTML =
       `<span class="t${isToday ? ' is-today' : ''}"${isToday ? ' title="Bugün"' : ''}>${shortDay[p.wd] || p.wd} ${p.d} ${TR_MON[p.mo - 1]}</span>` +
-      pair(windVal(maxWs), windColor(maxWs), windVal(maxWg), windColor(maxWg), 'Günün en yüksek rüzgarı – en yüksek hamlesi') +
+      pair(windVal(maxWs), windColor(maxWs), windVal(maxWg), windColor(maxWg), 'Günün en yüksek rüzgarı – en yüksek hamlesi', ' wind') +
       (tMin != null ? pair(tMin, tempColor(tMin), tMax, tempColor(tMax), 'Günün en düşük – en yüksek sıcaklığı (°C)', ' deg') : '') +
-      (rain >= 0.1 ? `<span class="rbox" title="Günün toplam yağışı (mm)"><svg viewBox="0 0 24 24"><path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z" fill="currentColor"/></svg>${rain.toFixed(1)}</span>` : '');
+      (ppMax != null ? `<span class="rbox pct" title="Günün en yüksek yağış olasılığı · toplam ${rain.toFixed(1)} mm">${ppMax}</span>` : '');
 
     if (resetFocus) {
       // Bugünse şimdiki saat, değilse öğlen
