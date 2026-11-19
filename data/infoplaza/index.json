@@ -1,12 +1,19 @@
 {
- "updatedAt": "2026-11-19T02:45:43.751Z",
+ "updatedAt": "2026-11-19T03:04:49.414Z",
  "locations": [
   {
    "name": "Ataşehir",
    "lat": 40.9923,
    "lon": 29.1244,
    "file": "40.9923_29.1244.json",
-   "fetchedAt": "2026-11-19T02:45:43.751Z"
+   "fetchedAt": "2026-11-19T03:04:49.415Z"
+  },
+  {
+   "name": "15 Temmuz Şehitler Köprüsü",
+   "lat": 41.0455,
+   "lon": 29.034,
+   "file": "41.0455_29.034.json",
+   "fetchedAt": "2026-11-19T03:04:50.701Z"
   }
  ]
 }
