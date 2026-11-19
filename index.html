@@ -11,11 +11,13 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
+  <!-- Üst satır: kayıtlı bölgeler + yenile + ayarlar -->
   <header class="topbar">
-    <h1 id="locTitle">Rüzgar Takip</h1>
+    <h1 id="locTitle" class="sr-only">Rüzgar Takip</h1>
+    <nav class="locbar" id="locBar" aria-label="Kayıtlı bölgeler"></nav>
     <button class="icon-btn" id="refreshBtn" title="Yenile" aria-label="Yenile">
       <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
@@ -23,9 +25,6 @@
       <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>
     </button>
   </header>
-
-  <!-- Kayıtlı bölgeler -->
-  <nav class="locbar" id="locBar" aria-label="Kayıtlı bölgeler"></nav>
 
   <!-- Harita + rüzgar pusulası -->
   <section class="mapwrap" id="mapWrap">
@@ -135,6 +134,6 @@
   </dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=7"></script>
 </body>
 </html>

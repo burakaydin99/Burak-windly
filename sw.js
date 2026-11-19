@@ -1,6 +1,6 @@
 // Uygulama kabuğunu önbelleğe alır; hava durumu API çağrıları her zaman ağdan gelir.
-const CACHE = 'ruzgar-v6';
-const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'icon.svg', 'manifest.webmanifest',
+const CACHE = 'ruzgar-v7';
+const SHELL = ['./', 'index.html', 'css/style.css?v=7', 'js/app.js?v=7', 'icon.svg', 'manifest.webmanifest',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'];
 
@@ -15,7 +15,8 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' || /open-meteo\.com|arcgisonline\.com|workers\.dev/.test(url.host) || url.pathname.includes("/data/infoplaza/")) return;
   // Ağ öncelikli, çevrimdışıyken önbellek
   e.respondWith(
-    fetch(e.request).then(r => {
+    // Site dosyaları her seferinde sunucuya doğrulatılır (eski sürüm takılı kalmasın)
+    fetch(url.origin === location.origin ? new Request(e.request.url, { cache: 'no-cache' }) : e.request).then(r => {
       const copy = r.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return r;
