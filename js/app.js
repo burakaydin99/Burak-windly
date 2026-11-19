@@ -395,16 +395,17 @@
 
   function initMap() {
     if (!window.L) return;
-    map = L.map('map', { zoomControl: false, attributionControl: true, tap: false });
+    map = L.map('map', { zoomControl: false, attributionControl: true, tap: false, zoomSnap: 0.25 });
     setMapLayer(state.mapLayer);
     map.on('click', onMapPick);
     fitAll(false);
     // Harita alanı yerleşim bitince/ekran dönünce değişir: boyutu güncelle ve bölgeleri ortala
-    let userMoved = false;
-    map.on('dragstart', () => { userMoved = true; });
+    map.on('dragstart', () => { state.mapMoved = true; });
+    map.getContainer().addEventListener('touchstart', e => { if (e.touches.length > 1) state.mapMoved = true; }, { passive: true });
+    map.getContainer().addEventListener('wheel', () => { state.mapMoved = true; }, { passive: true });
     new ResizeObserver(() => {
       map.invalidateSize();
-      if (!userMoved && !state.picking) fitAll(false);
+      if (!state.mapMoved && !state.picking) fitAll(false);
     }).observe($('#map'));
   }
 
@@ -434,19 +435,26 @@
   }
   const mapIsDark = () => (MAP_LAYERS[state.mapLayer] || MAP_LAYERS.dark).dark;
 
+  // Tüm kayıtlı noktaları gösterecek şekilde ortala. Kenar boşlukları etiketlere göre:
+  // etiket noktanın üstünde/altında ~22 px, sağda harita düğmeleri var.
   function fitAll(animate = true) {
     if (!map) return;
     const ls = state.locs;
-    if (ls.length > 1) map.fitBounds(L.latLngBounds(ls.map(l => [l.lat, l.lon])), { padding: [80, 80], maxZoom: 12, animate });
+    if (ls.length > 1) map.fitBounds(L.latLngBounds(ls.map(l => [l.lat, l.lon])), {
+      paddingTopLeft: [50, 26], paddingBottomRight: [70, 40], maxZoom: 13, animate,
+    });
     else if (ls.length) map.setView([ls[0].lat, ls[0].lon], 12, { animate });
     else map.setView([39.0, 35.0], 5);
   }
 
+  // Bölge seçilince: kullanıcı haritayı elle oynatmadıysa tüm noktalar görünür kalsın;
+  // oynattıysa ve seçilen nokta görünmüyorsa, o noktaya kaydır (yakınlaştırmadan).
   function focusSelected() {
     const l = curLoc();
     if (!map || !l) return;
+    if (!state.mapMoved) return fitAll();
     const ll = L.latLng(l.lat, l.lon);
-    if (!map.getBounds().pad(-0.15).contains(ll) || map.getZoom() < 8) map.setView(ll, Math.max(map.getZoom(), 10));
+    if (!map.getBounds().pad(-0.1).contains(ll)) map.panTo(ll);
   }
 
   // Her kayıtlı bölge için harita işareti; seçili bölge pusula olarak gösterilir.
@@ -801,7 +809,7 @@
       if (e.key === 'ArrowLeft') changeDay(-1);
       if (e.key === 'ArrowRight') changeDay(1);
     });
-    $('#fitBtn').addEventListener('click', () => fitAll());
+    $('#fitBtn').addEventListener('click', () => { state.mapMoved = false; fitAll(); });
     $('#settingsBtn').addEventListener('click', () => {
       renderEditList(); syncSeg('unitSeg', state.unit); syncSeg('stepSeg', state.step);
       $('#settingsDlg').showModal();
@@ -948,6 +956,7 @@
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) return;
       state.dayKey = null; state.focusT = null;
+      state.mapMoved = false; fitAll(false);
       refresh();
     });
   }
