@@ -1,0 +1,12 @@
+{
+  "name": "Rüzgar Takip",
+  "short_name": "Rüzgar",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#243444",
+  "theme_color": "#243444",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
