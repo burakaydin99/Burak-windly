@@ -7,9 +7,9 @@
   --muted: #9fb0c0;
   --accent: #19e3a3;
   --accent-ink: #0d3b2e;
-  --label-w: 64px;
+  --label-w: 52px;
   --col-w: 56px;
-  --row-h: 46px;
+  --row-h: 34px;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -26,9 +26,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* Üst bar */
 .topbar {
-  display: flex; align-items: center; gap: 4px;
-  padding: calc(env(safe-area-inset-top) + 8px) 12px 6px 16px;
+  display: flex; align-items: center; gap: 2px;
+  padding: calc(env(safe-area-inset-top) + 6px) 4px 6px 0;
 }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .topbar h1 { flex: 1; margin: 0; font-size: 24px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .icon-btn {
   width: 40px; height: 40px; border: 0; background: transparent; border-radius: 50%;
@@ -41,13 +42,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* Kayıtlı bölgeler */
 .locbar {
-  display: flex; gap: 8px; overflow-x: auto; padding: 4px 12px 10px;
+  flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; padding: 0 4px 0 10px;
   scrollbar-width: none;
 }
 .locbar::-webkit-scrollbar { display: none; }
 .chip {
   flex: none; border: 1px solid var(--line); background: var(--bg3);
-  border-radius: 20px; padding: 7px 14px; font-size: 15px; white-space: nowrap;
+  border-radius: 18px; padding: 6px 12px; font-size: 15px; white-space: nowrap;
   display: flex; align-items: center; gap: 6px;
 }
 .chip .w { font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 8px; color: #111; }
@@ -55,8 +56,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .chip.add { border-style: dashed; color: var(--muted); }
 
 /* Harita */
-.mapwrap { position: relative; height: 34vh; min-height: 180px; flex: none; transition: height .25s; }
-.mapwrap.picking { height: 55vh; }
+.mapwrap { position: relative; flex: 1 1 auto; min-height: 150px; transition: height .25s; }
+.mapwrap.picking { flex-basis: 60vh; }
 #map { position: absolute; inset: 0; background: #e9e5dc; }
 .map-btn {
   position: absolute; right: 10px; bottom: 22px; z-index: 600; width: 38px; height: 38px; border-radius: 10px;
@@ -91,58 +92,62 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .leaflet-control-attribution { font-size: 9px !important; }
 
 /* Modeller */
-.modelbar { display: flex; align-items: center; gap: 8px; padding: 10px 12px 4px; }
-.models { display: flex; gap: 4px; background: var(--bg2); border-radius: 12px; padding: 4px; overflow-x: auto; scrollbar-width: none; }
+.modelbar { display: flex; align-items: center; gap: 8px; padding: 6px 10px 0; }
+.models { display: flex; gap: 2px; background: var(--bg2); border-radius: 10px; padding: 3px; overflow-x: auto; scrollbar-width: none; }
 .models button {
-  border: 0; background: transparent; padding: 7px 12px; border-radius: 9px; font-size: 17px; font-weight: 600;
+  border: 0; background: transparent; padding: 4px 10px; border-radius: 8px; font-size: 14px; font-weight: 600;
   white-space: nowrap;
 }
 .models button.active { background: var(--accent); color: var(--accent-ink); }
-.source { font-size: 11px; color: var(--muted); margin-left: auto; text-align: right; line-height: 1.2; }
+.source { font-size: 12px; color: var(--muted); margin-left: auto; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
-/* Gün seçimi */
-.daynav { display: flex; align-items: center; gap: 6px; padding: 8px 8px; flex: none; }
+/* Gün seçimi — tek satır */
+.daynav { display: flex; align-items: center; gap: 6px; padding: 6px 8px; flex: none; }
 .nav-btn {
-  width: 46px; height: 46px; flex: none; border: 1px solid var(--line); background: var(--bg3); border-radius: 12px;
+  width: 38px; height: 34px; flex: none; border: 1px solid var(--line); background: var(--bg3); border-radius: 10px;
   display: grid; place-items: center;
 }
-.nav-btn svg { width: 24px; height: 24px; }
+.nav-btn svg { width: 20px; height: 20px; }
 .nav-btn:disabled { opacity: .3; cursor: default; }
 .nav-btn:not(:disabled):active { background: var(--accent); color: var(--accent-ink); }
-.dayinfo { flex: 1; text-align: center; min-width: 0; }
-.dayinfo .t { font-size: 19px; font-weight: 600; }
-.dayinfo .t .we { color: var(--accent); }
-.dayinfo .s { font-size: 13px; color: var(--muted); margin-top: 2px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-.dayinfo .s b { color: #111; padding: 0 6px; border-radius: 6px; font-weight: 700; }
-.dayinfo .today { font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 6px; padding: 1px 6px; vertical-align: 3px; margin-left: 6px; }
+.dayinfo {
+  flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 8px;
+  white-space: nowrap; overflow: hidden; font-size: 15px;
+}
+.dayinfo .t { font-weight: 600; }
+.dayinfo .we { color: var(--accent); }
+.dayinfo b { color: #111; padding: 0 5px; border-radius: 5px; font-weight: 700; font-size: 13px; }
+.dayinfo .m { color: var(--muted); font-size: 13px; }
+.dayinfo .today { font-size: 10px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 5px; padding: 1px 5px; }
 
 /* Tablo */
-.forecast { flex: 1; overflow: auto; position: relative; overscroll-behavior: contain; border-top: 1px solid var(--line); }
+.forecast { flex: 0 0 auto; max-height: 62vh; overflow: auto; position: relative; overscroll-behavior: contain; border-top: 1px solid var(--line); }
 .status { padding: 24px 16px; color: var(--muted); text-align: center; }
 .status.err { color: #ff8f80; }
 table.fc { min-width: 100%; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
 .fc th, .fc td { padding: 0; text-align: center; height: var(--row-h); min-width: 44px; white-space: nowrap; }
 .fc .lbl {
   position: sticky; left: 0; z-index: 3; background: var(--bg2);
-  min-width: var(--label-w); width: var(--label-w); color: var(--muted); font-size: 14px; font-weight: 500;
+  min-width: var(--label-w); width: var(--label-w); color: var(--muted); font-size: 12px; font-weight: 500; line-height: 1.1;
   border-right: 1px solid var(--line);
 }
-.fc .lbl svg { width: 22px; height: 22px; vertical-align: middle; }
+.fc .lbl svg { width: 18px; height: 18px; vertical-align: middle; }
+.fc .lbl small { font-size: 10px; }
 .fc thead th { position: sticky; z-index: 2; background: var(--bg); }
-.fc thead tr.hours th { top: 0; font-size: 18px; font-weight: 500; border-bottom: 1px solid var(--line); height: 40px; }
+.fc thead tr.hours th { top: 0; font-size: 15px; font-weight: 500; border-bottom: 1px solid var(--line); height: 30px; }
 .fc thead tr.hours th.lbl { z-index: 4; font-size: 13px; color: var(--accent); }
 .fc thead th.night { background: var(--bg2); }
 .fc thead th.focus { box-shadow: inset 0 -4px 0 var(--accent); }
 .fc td.now, .fc th.now { box-shadow: inset 0 0 0 999px rgba(255,255,255,.06); }
 .fc thead th.now { color: var(--accent); }
-.fc td.c { font-size: 18px; color: #111; font-weight: 500; }
-.fc td.icon svg { width: 34px; height: 34px; }
-.fc td.dir svg { width: 22px; height: 22px; color: var(--text); }
-.fc td.rain { font-size: 16px; }
+.fc td.c { font-size: 16px; color: #111; font-weight: 500; }
+.fc td.icon svg { width: 28px; height: 28px; }
+.fc td.dir svg { width: 18px; height: 18px; color: var(--text); }
+.fc td.rain { font-size: 14px; }
 .fc td.rain.r1 { background: rgba(80,160,255,.25); }
 .fc td.rain.r2 { background: rgba(80,160,255,.5); }
 .fc td.rain.r3 { background: rgba(80,120,255,.8); }
-.fc td.rh { font-size: 15px; color: var(--muted); }
+.fc td.rh { font-size: 13px; color: var(--muted); }
 .fc tbody tr:nth-child(odd) td:not(.c):not(.lbl):not(.rain.r1):not(.rain.r2):not(.rain.r3) { background: rgba(0,0,0,.04); }
 
 /* Dialoglar */
@@ -194,5 +199,5 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 }
 .ip-out.err { color: #ff8f80; }
 .hint code { background: var(--bg2); padding: 0 4px; border-radius: 4px; }
-.source .warn { color: #ffb36b; }
+.source .warn { color: #ffb36b; cursor: pointer; }
 .fld { display: block; font-size: 13px; color: var(--muted); }

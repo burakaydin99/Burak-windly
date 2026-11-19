@@ -330,6 +330,13 @@
     L.tileLayer(esri('World_Light_Gray_Reference'), { maxZoom: 16 }).addTo(map);
     map.on('click', onMapPick);
     fitAll(false);
+    // Harita alanı yerleşim bitince/ekran dönünce değişir: boyutu güncelle ve bölgeleri ortala
+    let userMoved = false;
+    map.on('dragstart', () => { userMoved = true; });
+    new ResizeObserver(() => {
+      map.invalidateSize();
+      if (!userMoved && !state.picking) fitAll(false);
+    }).observe($('#map'));
   }
 
   function fitAll(animate = true) {
@@ -501,13 +508,14 @@
       const todayKey = tparts(Date.now(), loc.tz).key;
       if (!state.days.find(d => d.key === state.dayKey)) state.dayKey = null;
       if (!state.dayKey) state.dayKey = (state.days.find(d => d.key === todayKey) || state.days[0])?.key;
-      const label = data.source === 'Infoplaza' ? 'Infoplaza' : `Open-Meteo · ${model.label}`;
-      $('#sourceTag').innerHTML = (data.offline
-        ? `${label} · çevrimdışı<br>son veri ${hhmm(data.at, loc.tz)}`
-        : data.dataAt
-          ? `${label}<br>${new Date(data.dataAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${hhmm(data.dataAt, loc.tz)} verisi`
-          : `${label} · canlı<br>güncellendi ${hhmm(data.at, loc.tz)}`)
-        + (data.fallback ? `<br><span class="warn">${esc(data.fallback)}</span>` : '');
+      // Tek satır kaynak bilgisi; Infoplaza'ya geçilemediyse kısa uyarı (dokununca sebebi)
+      const label = data.source === 'Infoplaza' ? 'Infoplaza' : 'Open-Meteo';
+      const t = data.dataAt || data.at;
+      const tag = $('#sourceTag');
+      tag.innerHTML = (data.fallback ? '<span class="warn">⚠ Infoplaza yok</span> · ' : '')
+        + `${label} · ${data.offline ? 'çevrimdışı ' : ''}${hhmm(t, loc.tz)}`;
+      tag.title = data.fallback || '';
+      tag.onclick = data.fallback ? () => alert(data.fallback) : null;
       renderDay(true);
       paintBadges();
     } catch (err) {
@@ -542,15 +550,15 @@
     const we = p.wd === 'Sat' || p.wd === 'Sun';
     const sun = sunTimes(Date.UTC(p.y, p.mo - 1, p.d, 12), loc.lat, loc.lon);
     const maxWs = Math.max(...day.rows.map(r => r.ws ?? 0));
+    const shortDay = { Mon: 'Pzt', Tue: 'Sal', Wed: 'Çar', Thu: 'Per', Fri: 'Cum', Sat: 'Cmt', Sun: 'Paz' };
     const maxWg = Math.max(...day.rows.map(r => r.wg ?? 0));
     const rain = day.rows.reduce((s, r) => s + (r.precip || 0), 0);
-    $('#dayInfo').innerHTML = `
-      <div class="t"><span class="${we ? 'we' : ''}">${TR_DAY[p.wd] || p.wd}, ${p.d} ${TR_MON[p.mo - 1]}</span>${isToday ? '<span class="today">BUGÜN</span>' : ''}</div>
-      <div class="s">
-        <span>maks <b style="background:${windColor(maxWs)}">${windVal(maxWs)}</b> / <b style="background:${windColor(maxWg)}">${windVal(maxWg)}</b></span>
-        ${rain >= 0.1 ? `<span>💧 ${rain.toFixed(1)} mm</span>` : ''}
-        ${sun ? `<span>☀ ${hhmm(sun.rise, loc.tz)} – ${hhmm(sun.set, loc.tz)}</span>` : ''}
-      </div>`;
+    $('#dayInfo').innerHTML =
+      `<span class="t${we ? ' we' : ''}">${shortDay[p.wd] || p.wd} ${p.d} ${TR_MON[p.mo - 1]}</span>` +
+      (isToday ? '<span class="today">BUGÜN</span>' : '') +
+      `<span><b style="background:${windColor(maxWs)}">${windVal(maxWs)}</b>/<b style="background:${windColor(maxWg)}">${windVal(maxWg)}</b></span>` +
+      (rain >= 0.1 ? `<span class="m">💧${rain.toFixed(1)}</span>` : '') +
+      (sun ? `<span class="m">☀${hhmm(sun.rise, loc.tz)}–${hhmm(sun.set, loc.tz)}</span>` : '');
 
     if (resetFocus) {
       // Bugünse şimdiki saat, değilse öğlen
