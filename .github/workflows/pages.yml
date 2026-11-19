@@ -1,6 +1,6 @@
 name: GitHub Pages
+# Yayın gh-pages dalından yapılıyor; bu iş yalnızca elle çalıştırılır.
 on:
-  push:
   workflow_dispatch:
 permissions:
   contents: read
