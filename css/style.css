@@ -240,8 +240,3 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 .pin.sel .pill { font-size: 14px; line-height: 20px; box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0,0,0,.5); }
 .pin.sel .pill .pd svg { width: 15px; height: 15px; }
 .pin.sel .pn { font-size: 12px; font-weight: 700; }
-
-/* Köprü modu */
-.h80 { font-size: 9px; font-weight: 700; color: var(--accent); letter-spacing: .02em; }
-.source .h80 { font-size: 11px; }
-.edit-list button.on { background: var(--accent); color: var(--accent-ink); }
