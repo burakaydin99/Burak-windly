@@ -258,4 +258,14 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 .modelbar { padding-top: 0; padding-bottom: 6px; }
 
 /* Gün satırı: en düşük / en yüksek sıcaklık */
-.dayinfo b.tb sup { font-size: 9px; vertical-align: 5px; margin-left: 1px; }
+
+/* Gün satırı kutuları: iki renge bölünmüş tek dikdörtgen + yağış kutusu */
+.dayinfo .dbox { display: inline-flex; align-items: stretch; border-radius: 5px; overflow: hidden; line-height: 20px; }
+.dayinfo .dbox b { border-radius: 0; padding: 0 6px; }
+.dayinfo .dbox i { font-style: normal; font-weight: 700; font-size: 12px; padding: 0 3px; background: #3a4048; color: #fff; }
+.dayinfo .dbox sup { font-size: 9px; vertical-align: 5px; margin-left: 1px; }
+.dayinfo .rbox {
+  display: inline-flex; align-items: center; gap: 3px; line-height: 20px; padding: 0 7px 0 5px; border-radius: 5px;
+  background: #3f7fe0; color: #fff; font-weight: 700; font-size: 13px;
+}
+.dayinfo .rbox svg { width: 11px; height: 11px; }
