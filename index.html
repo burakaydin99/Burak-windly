@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#243444">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Rüzgar Takip</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 id="locTitle">Rüzgar Takip</h1>
+    <button class="icon-btn" id="refreshBtn" title="Yenile" aria-label="Yenile">
+      <svg viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="icon-btn" id="settingsBtn" title="Ayarlar" aria-label="Ayarlar">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="19" r="2" fill="currentColor"/></svg>
+    </button>
+  </header>
+
+  <!-- Kayıtlı bölgeler -->
+  <nav class="locbar" id="locBar" aria-label="Kayıtlı bölgeler"></nav>
+
+  <!-- Harita + rüzgar pusulası -->
+  <section class="mapwrap" id="mapWrap">
+    <div id="map"></div>
+    <div class="compass" id="compass" aria-hidden="true"></div>
+    <div class="pick-banner" id="pickBanner" hidden>
+      Haritada bir noktaya dokun
+      <button id="pickCancel">Vazgeç</button>
+    </div>
+  </section>
+
+  <!-- Model seçimi -->
+  <div class="modelbar">
+    <div class="models" id="modelTabs"></div>
+    <span class="source" id="sourceTag"></span>
+  </div>
+
+  <!-- Gün şeridi -->
+  <div class="daystrip" id="dayStrip"></div>
+
+  <!-- Saatlik tablo (yana kaydırmalı) -->
+  <main class="forecast" id="forecast">
+    <div class="status" id="status">Bölge seç veya ekle…</div>
+  </main>
+
+  <!-- Bölge ekleme -->
+  <dialog id="addDlg" class="sheet">
+    <form method="dialog" class="sheet-head">
+      <h2>Bölge ekle</h2>
+      <button class="icon-btn" value="cancel" aria-label="Kapat">✕</button>
+    </form>
+    <input id="searchInput" type="search" placeholder="Yer ara (örn. Ataşehir, Alaçatı)…" autocomplete="off">
+    <ul id="searchResults" class="results"></ul>
+    <div class="row-btns">
+      <button id="gpsBtn" class="btn">📍 Konumumu kullan</button>
+      <button id="mapPickBtn" class="btn">🗺️ Haritadan seç</button>
+    </div>
+    <details class="manual">
+      <summary>Koordinat gir</summary>
+      <div class="manual-grid">
+        <input id="mName" placeholder="İsim">
+        <input id="mLat" placeholder="Enlem (40.99)" inputmode="decimal">
+        <input id="mLon" placeholder="Boylam (29.12)" inputmode="decimal">
+        <button id="mAdd" class="btn primary">Ekle</button>
+      </div>
+    </details>
+  </dialog>
+
+  <!-- Ayarlar / bölgeleri düzenle -->
+  <dialog id="settingsDlg" class="sheet">
+    <form method="dialog" class="sheet-head">
+      <h2>Ayarlar</h2>
+      <button class="icon-btn" value="cancel" aria-label="Kapat">✕</button>
+    </form>
+
+    <h3>Bölgeler</h3>
+    <ul id="locEditList" class="edit-list"></ul>
+
+    <h3>Rüzgar birimi</h3>
+    <div class="seg" id="unitSeg">
+      <button data-v="kmh">km/s</button><button data-v="kt">knot</button><button data-v="ms">m/sn</button><button data-v="bft">Bft</button>
+    </div>
+
+    <h3>Zaman adımı</h3>
+    <div class="seg" id="stepSeg">
+      <button data-v="1">1 saat</button><button data-v="3">3 saat</button>
+    </div>
+
+    <h3>Windy API anahtarı</h3>
+    <p class="hint">
+      Veriler Windy Point Forecast API'den alınır
+      (<a href="https://api.windy.com/keys" target="_blank" rel="noopener">api.windy.com/keys</a> → “Point Forecast API”).
+      Anahtar yoksa veya model Windy API'de yoksa aynı modeller Open-Meteo'dan çekilir.
+    </p>
+    <input id="windyKey" type="text" placeholder="Windy Point Forecast API key" autocomplete="off" spellcheck="false">
+  </dialog>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
