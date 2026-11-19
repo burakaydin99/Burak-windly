@@ -18,6 +18,22 @@ Windy / Windguru tarzı, telefona uygun bir rüzgar tahmin uygulaması.
   - zaman adımı (1 veya 3 saat)
   - bölgeleri yeniden adlandırma, sıralama, silme
 
+## Motor modu
+
+Model satırındaki 🏍 düğmesiyle (veya Ayarlar → Motor modu) açılır:
+- **Hamle▲ satırı**, o saat için tüm kaynakların en yüksek hamlesini gösterir. Kaynaklar GFS, ICON, ECMWF ve varsa Infoplaza. Hücreye dokununca her kaynağın değeri görünür. Seçili kaynaktan belirgin yüksekse hücrenin altında koyu bir çizgi olur.
+- **Sürüş satırı**, her saati renkle işaretler:
+  - 🟢 uygun
+  - 🟡 dikkat: hamle ≥ 40 km/s, yağış ≥ 0.2 mm/saat veya sıcaklık ≤ 3 °C
+  - 🔴 riskli: hamle ≥ 55 km/s veya yağış ≥ 1 mm/saat
+
+  Hamle eşikleri Ayarlar'dan değiştirilebilir.
+- **Gün satırı**, gündüz saatlerindeki en uzun uygun aralığı gösterir (🏍 09–15). Uygun saat yoksa 🏍 ✗ yazar.
+
+## Harita
+
+Harita düğmesinden dört görünüm seçilebilir: Koyu (varsayılan), Açık, Uydu ve Sokak. Hepsi anahtarsızdır: Esri ve OpenStreetMap.
+
 ## Veri kaynakları (Ayarlar → Veri kaynağı)
 
 1. **Open-Meteo** (varsayılan): API anahtarı gerektirmez, veriler canlı gelir. Windy'nin de kullandığı GFS, ECMWF ve ICON modellerini sunar.

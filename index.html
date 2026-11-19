@@ -11,7 +11,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="css/style.css?v=7">
+  <link rel="stylesheet" href="css/style.css?v=8">
 </head>
 <body>
   <!-- Üst satır: kayıtlı bölgeler + yenile + ayarlar -->
@@ -29,6 +29,12 @@
   <!-- Harita + rüzgar pusulası -->
   <section class="mapwrap" id="mapWrap">
     <div id="map"></div>
+    <button class="map-btn" id="layerBtn" title="Harita görünümü" aria-label="Harita görünümü">
+      <svg viewBox="0 0 24 24"><path d="M12 3l9 5-9 5-9-5 9-5zM3 13l9 5 9-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="layer-menu" id="layerMenu" hidden>
+      <button data-v="dark">Koyu</button><button data-v="light">Açık</button><button data-v="sat">Uydu</button><button data-v="street">Sokak</button>
+    </div>
     <button class="map-btn" id="fitBtn" title="Tüm bölgeleri göster" aria-label="Tüm bölgeleri göster">
       <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
@@ -41,6 +47,7 @@
   <!-- Model seçimi -->
   <div class="modelbar">
     <div class="models" id="modelTabs"></div>
+    <button class="moto-btn" id="motorBtn" title="Motor modu" aria-label="Motor modu" aria-pressed="false">🏍</button>
     <span class="source" id="sourceTag"></span>
   </div>
 
@@ -93,6 +100,16 @@
     <h3>Bölgeler</h3>
     <ul id="locEditList" class="edit-list"></ul>
 
+    <h3>Motor modu</h3>
+    <div class="seg" id="motorSeg"><button data-v="off">Kapalı</button><button data-v="on">Açık</button></div>
+    <p class="hint">Hamle satırı tüm kaynakların (GFS, ICON, ECMWF, Infoplaza) <b>en yükseğini</b> gösterir; her saat için sürüş durumu
+      🟢 uygun / 🟡 dikkat / 🔴 riskli olarak işaretlenir. Yağış (≥0.2 mm/saat dikkat, ≥1 riskli) ve 3°C ve altı (buzlanma) da hesaba katılır.</p>
+    <div class="manual-grid">
+      <label class="fld" for="mWarn">🟡 Dikkat: hamle ≥ (km/s)</label><label class="fld" for="mRisk">🔴 Riskli: hamle ≥ (km/s)</label>
+      <input id="mWarn" type="number" inputmode="numeric" min="10" max="150">
+      <input id="mRisk" type="number" inputmode="numeric" min="10" max="150">
+    </div>
+
     <h3>Rüzgar birimi</h3>
     <div class="seg" id="unitSeg">
       <button data-v="kmh">km/s</button><button data-v="kt">knot</button><button data-v="ms">m/sn</button><button data-v="bft">Bft</button>
@@ -134,6 +151,6 @@
   </dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="js/app.js?v=7"></script>
+  <script src="js/app.js?v=8"></script>
 </body>
 </html>

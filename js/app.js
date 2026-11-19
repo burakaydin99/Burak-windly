@@ -30,6 +30,10 @@
     source: store.get('source', 'openmeteo'),
     ipKey: store.get('ipKey', ''),
     ipProxy: store.get('ipProxy', ''),
+    mapLayer: store.get('mapLayer', 'dark'),
+    motor: store.get('motor', false),
+    motorWarn: store.get('motorWarn', 40),   // hamle km/s: dikkat
+    motorRisk: store.get('motorRisk', 55),   // hamle km/s: riskli
     rows: [],          // seçili bölgenin tüm satırları (7 gün)
     days: [],          // [{key, rows}]
     dayKey: null,      // gösterilen gün (null = bugün)
@@ -292,6 +296,61 @@
     return data;
   }
 
+  // ---------- Motor modu: tüm kaynakların en yüksek hamlesi ----------
+  // Open-Meteo'dan GFS + ICON + ECMWF tek istekte, varsa Infoplaza da; her saat için en yüksek hamle.
+  async function getGustEnsemble(loc, { force = false } = {}) {
+    const key = `ens|${loc.lat},${loc.lon}`;
+    const c = memCache.get(key);
+    if (!force && c && Date.now() - c.at < CACHE_MS) return c.data;
+    const byT = new Map();
+    const add = (t, src, g) => {
+      if (g == null || !isFinite(g)) return;
+      const e = byT.get(t) || {};
+      e[src] = g; byT.set(t, e);
+    };
+    const models = { GFS: 'gfs_seamless', ICON: 'icon_seamless', ECMWF: 'ecmwf_ifs025' };
+    const jobs = [
+      fetch(`https://api.open-meteo.com/v1/forecast?${new URLSearchParams({
+        latitude: loc.lat, longitude: loc.lon, hourly: 'wind_gusts_10m', models: Object.values(models).join(','),
+        forecast_days: FORECAST_DAYS, wind_speed_unit: 'kmh', timeformat: 'unixtime',
+      })}`, { cache: 'no-store' }).then(r => r.json()).then(j => {
+        const h = j.hourly;
+        for (const [name, m] of Object.entries(models)) (h[`wind_gusts_10m_${m}`] || []).forEach((g, i) => add(h.time[i] * 1000, name, g));
+      }),
+      fetchInfoplazaFromSite(loc).then(d => d.hours.forEach(r => add(r.t, 'Infoplaza', r.wg))),
+    ];
+    await Promise.allSettled(jobs);
+    memCache.set(key, { at: Date.now(), data: byT });
+    return byT;
+  }
+  function applyGustEnsemble(data, ens) {
+    return {
+      ...data,
+      hours: data.hours.map(h => {
+        const e = { ...(ens.get(h.t) || {}) };
+        if (h.wg != null) e[data.source === 'Infoplaza' ? 'Infoplaza' : MODELS.find(m => m.id === state.model).label] ??= h.wg;
+        const vals = Object.entries(e);
+        if (!vals.length) return h;
+        const [src, g] = vals.reduce((a, b) => (b[1] > a[1] ? b : a));
+        return { ...h, wgBase: h.wg, wg: g, wgSrc: src, wgAll: e };
+      }),
+    };
+  }
+  // Sürüş durumu: 2 = riskli, 1 = dikkat, 0 = uygun
+  function rideLevel(r) {
+    const g = r.wg ?? 0, p = r.precipH ?? 0;
+    if (g >= state.motorRisk || p >= 1) return 2;
+    if (g >= state.motorWarn || p >= 0.2 || (r.temp != null && Math.round(r.temp) <= 3)) return 1;
+    return 0;
+  }
+  function rideWhy(r) {
+    const w = [];
+    if ((r.wg ?? 0) >= state.motorWarn) w.push(`hamle ${windVal(r.wg)} ${unitLabel()}${r.wgSrc ? ' (' + r.wgSrc + ')' : ''}`);
+    if ((r.precipH ?? 0) >= 0.2) w.push(`yağış ${(r.precip ?? 0).toFixed(1)} mm`);
+    if (r.temp != null && Math.round(r.temp) <= 3) w.push(`soğuk ${Math.round(r.temp)}°C (buzlanma)`);
+    return w.join(', ') || 'uygun';
+  }
+
   // Saatlik veriyi seçilen adıma (1s / 3s) indir; hamle = pencere içindeki maks., yağış = toplam
   function buildRows(data, loc) {
     const hrs = data.hours;
@@ -324,10 +383,7 @@
   function initMap() {
     if (!window.L) return;
     map = L.map('map', { zoomControl: false, attributionControl: true, tap: false });
-    // Anahtarsız açık gri altlık + yer adları (Esri)
-    const esri = n => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${n}/MapServer/tile/{z}/{y}/{x}`;
-    L.tileLayer(esri('World_Light_Gray_Base'), { maxZoom: 16, attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap' }).addTo(map);
-    L.tileLayer(esri('World_Light_Gray_Reference'), { maxZoom: 16 }).addTo(map);
+    setMapLayer(state.mapLayer);
     map.on('click', onMapPick);
     fitAll(false);
     // Harita alanı yerleşim bitince/ekran dönünce değişir: boyutu güncelle ve bölgeleri ortala
@@ -338,6 +394,32 @@
       if (!userMoved && !state.picking) fitAll(false);
     }).observe($('#map'));
   }
+
+  // ---- Harita altlıkları (hepsi anahtarsız)
+  const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+  const ESRI_ATTR = 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap';
+  const MAP_LAYERS = {
+    dark:   { label: 'Koyu',  dark: true,  max: 16, attr: ESRI_ATTR,
+              urls: [`${ESRI}Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`, `${ESRI}Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`] },
+    light:  { label: 'Açık',  dark: false, max: 16, attr: ESRI_ATTR,
+              urls: [`${ESRI}Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}`, `${ESRI}Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}`] },
+    sat:    { label: 'Uydu',  dark: true,  max: 18, attr: 'Imagery © Esri, Maxar, Earthstar Geographics',
+              urls: [`${ESRI}World_Imagery/MapServer/tile/{z}/{y}/{x}`, `${ESRI}Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}`] },
+    street: { label: 'Sokak', dark: false, max: 19, attr: '© OpenStreetMap katkıcıları',
+              urls: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'] },
+  };
+  let baseLayers = [];
+  function setMapLayer(id) {
+    const cfg = MAP_LAYERS[id] || MAP_LAYERS.dark;
+    state.mapLayer = MAP_LAYERS[id] ? id : 'dark';
+    store.set('mapLayer', state.mapLayer);
+    baseLayers.forEach(l => map.removeLayer(l));
+    baseLayers = cfg.urls.map((u, i) => L.tileLayer(u, { maxZoom: cfg.max, attribution: i ? '' : cfg.attr }).addTo(map));
+    $('#mapWrap').classList.toggle('dark', cfg.dark);
+    document.querySelectorAll('#layerMenu button').forEach(b => b.classList.toggle('active', b.dataset.v === state.mapLayer));
+    renderCompass();
+  }
+  const mapIsDark = () => (MAP_LAYERS[state.mapLayer] || MAP_LAYERS.dark).dark;
 
   function fitAll(animate = true) {
     if (!map) return;
@@ -360,16 +442,18 @@
     const px = cx + Math.cos(rad) * 38, py = cy + Math.sin(rad) * 38;
     const txt = `${windVal(r.ws)} ${unitLabel()}`;
     const w = txt.length * 7.4 + 14;
+    const dk = mapIsDark();
+    const ring = dk ? '#cfd8e0' : '#555', face = dk ? 'rgba(10,20,30,.45)' : 'rgba(255,255,255,.35)', ink = dk ? '#fff' : '#333';
     return `<svg viewBox="0 0 140 140" width="140" height="140">
-      <circle cx="${cx}" cy="${cy}" r="62" fill="rgba(255,255,255,.35)" stroke="#555" stroke-width="2"/>
-      <g font-size="12" text-anchor="middle" fill="#555" font-family="system-ui">
+      <circle cx="${cx}" cy="${cy}" r="62" fill="${face}" stroke="${ring}" stroke-width="2"/>
+      <g font-size="12" text-anchor="middle" fill="${ring}" font-family="system-ui">
         <text x="70" y="22" fill="#d33">K</text><text x="70" y="128">G</text><text x="16" y="74">B</text><text x="124" y="74">D</text>
       </g>
       <g transform="rotate(${r.wd + 180} 70 70)">
-        <line x1="70" y1="104" x2="70" y2="40" stroke="#333" stroke-width="3" stroke-linecap="round"/>
-        <path d="M70 32l-8 12h16z" fill="#333"/>
+        <line x1="70" y1="104" x2="70" y2="40" stroke="${ink}" stroke-width="3" stroke-linecap="round"/>
+        <path d="M70 32l-8 12h16z" fill="${ink}"/>
       </g>
-      <circle cx="70" cy="70" r="7" fill="#fff" stroke="#555" stroke-width="2"/>
+      <circle cx="70" cy="70" r="7" fill="#fff" stroke="${ring}" stroke-width="2"/>
       <g transform="translate(${px} ${py})">
         <rect x="${-w / 2}" y="-11" width="${w}" height="22" rx="11" fill="${windColor(r.ws)}" stroke="rgba(0,0,0,.35)"/>
         <text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#111" font-family="system-ui">${txt}</text>
@@ -499,7 +583,13 @@
       if (reqId !== load.req) return;
       loc._data = data;
       const model = MODELS.find(m => m.id === state.model);
-      state.rows = buildRows(data, loc);
+      let shown = data;
+      if (state.motor) {
+        const ens = await getGustEnsemble(loc, { force });
+        if (reqId !== load.req) return;
+        shown = applyGustEnsemble(data, ens);
+      }
+      state.rows = buildRows(shown, loc);
       state.days = [];
       for (const r of state.rows) {
         const d = state.days[state.days.length - 1];
@@ -557,14 +647,29 @@
       `<span class="t${we ? ' we' : ''}">${shortDay[p.wd] || p.wd} ${p.d} ${TR_MON[p.mo - 1]}</span>` +
       (isToday ? '<span class="today">BUGÜN</span>' : '') +
       `<span><b style="background:${windColor(maxWs)}">${windVal(maxWs)}</b>/<b style="background:${windColor(maxWg)}">${windVal(maxWg)}</b></span>` +
-      (rain >= 0.1 ? `<span class="m">💧${rain.toFixed(1)}</span>` : '') +
-      (sun ? `<span class="m">☀${hhmm(sun.rise, loc.tz)}–${hhmm(sun.set, loc.tz)}</span>` : '');
+      (rain >= 0.1 && !state.motor ? `<span class="m">💧${rain.toFixed(1)}</span>` : '') +
+      (state.motor ? rideSummary(day.rows) : sun ? `<span class="m">☀${hhmm(sun.rise, loc.tz)}–${hhmm(sun.set, loc.tz)}</span>` : '');
 
     if (resetFocus) {
       // Bugünse şimdiki saat, değilse öğlen
       state.focusT = isToday ? null : day.rows.reduce((a, b) => Math.abs(b.p.h - 12) < Math.abs(a.p.h - 12) ? b : a).t;
     }
     renderTable(day.rows, loc);
+  }
+
+  // Gündüz saatlerinde en uzun "uygun" aralık
+  function rideSummary(rows) {
+    const now = Date.now(), stepMs = state.step * 3600e3;
+    let best = null, cur = null;
+    for (const r of rows) {
+      const ok = r.day && rideLevel(r) === 0 && r.t + stepMs > now;
+      if (ok) { cur = cur ? { ...cur, b: r } : { a: r, b: r }; if (!best || cur.b.t - cur.a.t > best.b.t - best.a.t) best = cur; }
+      else cur = null;
+    }
+    const h = r => String(r.p.h).padStart(2, '0');
+    if (!best) return '<span class="ride-sum l2" title="Bugün uygun saat yok">🏍 ✗</span>';
+    const end = (best.b.p.h + state.step) % 24;
+    return `<span class="ride-sum l0" title="En uzun uygun aralık">🏍 ${h(best.a)}–${String(end).padStart(2, '0')}</span>`;
   }
 
   function renderTable(rows, loc) {
@@ -593,7 +698,15 @@
     row(icoSun, (r, i) => `<td class="${cls(i, 'icon')}">${weatherIcon(r)}</td>`);
     row(icoDir, (r, i) => `<td class="${cls(i, 'dir')}" title="${Math.round(r.wd)}°">${arrow(r.wd)}</td>`);
     row(`${unitLabel()}<br><small>rüzgar</small>`, (r, i) => `<td class="${cls(i, 'c')}" style="background:${windColor(r.ws)}">${windVal(r.ws)}</td>`);
-    row(`${unitLabel()}<br><small>hamle</small>`, (r, i) => `<td class="${cls(i, 'c')}" style="background:${windColor(r.wg)}">${windVal(r.wg)}</td>`);
+    row(`${unitLabel()}<br><small>${state.motor ? 'hamle▲' : 'hamle'}</small>`, (r, i) => {
+      const up = state.motor && r.wgBase != null && r.wg - r.wgBase >= 3;
+      const tip = r.wgAll ? Object.entries(r.wgAll).map(([k, v]) => `${k} ${windVal(v)}`).join(' · ') : '';
+      return `<td class="${cls(i, 'c' + (up ? ' up' : ''))}" style="background:${windColor(r.wg)}"${tip ? ` title="${tip}"` : ''}>${windVal(r.wg)}</td>`;
+    });
+    if (state.motor) {
+      const icoMoto = '<svg viewBox="0 0 24 24"><circle cx="5.5" cy="16.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18.5" cy="16.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 16.5l4-7h5l4 7M14 9.5l-1.5-3H15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      row(icoMoto, (r, i) => { const lv = rideLevel(r); return `<td class="${cls(i, 'ride l' + lv)}" title="${rideWhy(r)}"><span></span></td>`; });
+    }
     row('°C', (r, i) => `<td class="${cls(i, 'c')}" style="background:${tempColor(r.temp)}">${r.temp != null ? Math.round(r.temp) + '°' : '–'}</td>`);
     row(`mm<br><small>/${state.step}s</small>`, (r, i) => {
       const p = r.precip, ph = r.precipH ?? 0;
@@ -703,6 +816,30 @@
       renderEditList(); syncSeg('unitSeg', state.unit); syncSeg('stepSeg', state.step);
       $('#settingsDlg').showModal();
     });
+    // Motor modu
+    const syncMotor = () => {
+      syncSeg('motorSeg', state.motor ? 'on' : 'off');
+      $('#motorBtn').classList.toggle('active', state.motor);
+      $('#motorBtn').setAttribute('aria-pressed', state.motor);
+      $('#mWarn').value = state.motorWarn; $('#mRisk').value = state.motorRisk;
+    };
+    const setMotor = on => { state.motor = on; store.set('motor', on); syncMotor(); load(); };
+    $('#motorBtn').addEventListener('click', () => setMotor(!state.motor));
+    $('#motorSeg').addEventListener('click', e => { const v = e.target.dataset.v; if (v) setMotor(v === 'on'); });
+    ['mWarn', 'mRisk'].forEach(id => $('#' + id).addEventListener('change', () => {
+      const w = +$('#mWarn').value, r = +$('#mRisk').value;
+      if (w > 0 && r > w) { state.motorWarn = w; state.motorRisk = r; store.set('motorWarn', w); store.set('motorRisk', r); load(); }
+      else syncMotor();
+    }));
+    syncMotor();
+    // Harita katmanı menüsü
+    $('#layerBtn').addEventListener('click', e => { e.stopPropagation(); $('#layerMenu').hidden = !$('#layerMenu').hidden; });
+    $('#layerMenu').addEventListener('click', e => {
+      const v = e.target.dataset.v; if (!v || !map) return;
+      setMapLayer(v); $('#layerMenu').hidden = true;
+    });
+    document.addEventListener('click', e => { if (!e.target.closest('#layerMenu, #layerBtn')) $('#layerMenu').hidden = true; });
+
     $('#unitSeg').addEventListener('click', e => {
       const v = e.target.dataset.v; if (!v) return;
       state.unit = v; store.set('unit', v); syncSeg('unitSeg', v); load(); paintBadges();
