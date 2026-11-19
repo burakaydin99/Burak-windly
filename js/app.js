@@ -377,7 +377,7 @@
   const nearest = (hours, t) => hours.reduce((a, b) => Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a, hours[0]);
 
   // ---------- Harita ----------
-  let map, compassMk;
+  let map;
   const pins = new Map();
 
   function initMap() {
@@ -436,30 +436,12 @@
     if (!map.getBounds().pad(-0.15).contains(ll) || map.getZoom() < 8) map.setView(ll, Math.max(map.getZoom(), 10));
   }
 
-  function compassSvg(r) {
-    const cx = 70, cy = 70;
-    const dk = mapIsDark();
-    const ring = dk ? '#cfd8e0' : '#555', face = dk ? 'rgba(10,20,30,.45)' : 'rgba(255,255,255,.35)', ink = dk ? '#fff' : '#333';
-    return `<svg viewBox="0 0 140 140" width="140" height="140">
-      <circle cx="${cx}" cy="${cy}" r="62" fill="${face}" stroke="${ring}" stroke-width="2"/>
-      <g font-size="12" text-anchor="middle" fill="${ring}" font-family="system-ui">
-        <text x="70" y="22" fill="#d33">K</text><text x="70" y="128">G</text><text x="16" y="74">B</text><text x="124" y="74">D</text>
-      </g>
-      <g transform="rotate(${r.wd + 180} 70 70)">
-        <line x1="70" y1="104" x2="70" y2="40" stroke="${ink}" stroke-width="3" stroke-linecap="round"/>
-        <path d="M70 32l-8 12h16z" fill="${ink}"/>
-      </g>
-      <circle cx="70" cy="70" r="7" fill="#fff" stroke="${ring}" stroke-width="2"/>
-    </svg>`;
-  }
-
   // Her kayıtlı bölge için harita işareti; seçili bölge pusula olarak gösterilir.
   function renderMarkers() {
     if (!map) return;
     const live = new Set(state.locs.map(l => l.id));
     for (const [id, m] of pins) if (!live.has(id)) { map.removeLayer(m); pins.delete(id); }
     for (const l of state.locs) {
-      if (l.id === state.sel) { if (pins.has(l.id)) { map.removeLayer(pins.get(l.id)); pins.delete(l.id); } continue; }
       let m = pins.get(l.id);
       if (!m) {
         m = L.marker([l.lat, l.lon], { icon: pinIcon(l, null), riseOnHover: true });
@@ -467,9 +449,9 @@
         m.addTo(map);
         pins.set(l.id, m);
       } else m.setLatLng([l.lat, l.lon]);
-      m.setIcon(pinIcon(l, l._r));
+      m.setIcon(pinIcon(l, l._r, l.id === state.sel));
+      m.setZIndexOffset(l.id === state.sel ? 1000 : 0);
     }
-    renderCompass();
   }
   // Şiddet: 0 yeşil, 1 sarı, 2 kırmızı (km/s). Hamle eşikleri Motor modu ayarlarıyla aynı.
   const sevWind = v => v == null ? -1 : v >= 35 ? 2 : v >= 20 ? 1 : 0;
@@ -482,21 +464,14 @@
       `<span class="pd">${arrow(r.wd, 13)}</span>` +
       `<span class="pg s${sevGust(r.wg)}">${windVal(r.wg)}</span></span>`;
   }
-  function pinIcon(l, r) {
+  function pinIcon(l, r, sel = false) {
     return L.divIcon({
       className: 'pin-wrap', iconSize: null,
-      html: `<div class="pin">${windPill(r)}<span class="pn">${esc(l.name)}</span></div>`,
+      html: `<div class="pin${sel ? ' sel' : ''}">${windPill(r)}<span class="pn">${esc(l.name)}</span></div>`,
     });
   }
-  function renderCompass() {
-    if (!map) return;
-    const l = curLoc();
-    const r = l?._r;
-    if (!l || !r) { if (compassMk) { map.removeLayer(compassMk); compassMk = null; } return; }
-    const icon = L.divIcon({ className: 'compass-mk', iconSize: [140, 140], iconAnchor: [70, 70], html: compassSvg(r) + `<div class="cpill">${windPill(r)}</div><span class="pn">${esc(l.name)}</span>` });
-    if (!compassMk) compassMk = L.marker([l.lat, l.lon], { icon, interactive: false, zIndexOffset: -100 }).addTo(map);
-    else { compassMk.setLatLng([l.lat, l.lon]); compassMk.setIcon(icon); }
-  }
+  // (Eski pusula kaldırıldı; seçili bölge de etiketle gösterilir.)
+  const renderCompass = () => renderMarkers();
 
   function setPicking(on) {
     state.picking = on;

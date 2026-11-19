@@ -74,14 +74,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
   font: 700 12px/16px system-ui, sans-serif; color: #111; border: 1.5px solid rgba(0,0,0,.45); box-shadow: 0 1px 4px rgba(0,0,0,.35);
 }
 .pill > span { display: flex; align-items: center; padding: 1px 6px; }
-.pill .pd { padding: 1px 2px; background: #fff; color: #111; }
+.pill .pd { padding: 1px 3px; background: #3a4048; color: #fff; }
 .pill .pd svg { width: 13px; height: 13px; }
 .pill .s0 { background: #3ccf6e; }
 .pill .s1 { background: #f2c037; }
 .pill .s2 { background: #ef4d43; color: #fff; }
 .pill .s-1 { background: #ccd3da; }
-.mapwrap.dark .pill .pd { background: #1e2329; color: #fff; }
-.compass-mk .cpill { position: absolute; left: 70px; top: 90px; transform: translateX(-50%); }
 .pin .pn {
   margin-top: 1px; font: 600 11px system-ui, sans-serif; color: #1b2733; white-space: nowrap;
   text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
@@ -237,3 +235,8 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 .ride-sum { font-size: 13px; font-weight: 600; }
 .ride-sum.l0 { color: #3ccf6e; }
 .ride-sum.l2 { color: #ff8f80; }
+
+/* Seçili bölge: daha büyük etiket + vurgu çerçevesi */
+.pin.sel .pill { font-size: 14px; line-height: 20px; box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0,0,0,.5); }
+.pin.sel .pill .pd svg { width: 15px; height: 15px; }
+.pin.sel .pn { font-size: 12px; font-weight: 700; }
