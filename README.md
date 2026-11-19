@@ -28,7 +28,6 @@ Ayarlar → Motor modu bölümünden açılır:
   - 🔴 riskli: hamle ≥ 55 km/s veya yağış ≥ 1 mm/saat
 
   Hamle eşikleri Ayarlar'dan değiştirilebilir.
-- **Gün satırı**, gündüz saatlerindeki en uzun uygun aralığı gösterir (🏍 09–15). Uygun saat yoksa 🏍 ✗ yazar.
 
 ## Harita
 

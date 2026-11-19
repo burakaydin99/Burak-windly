@@ -228,9 +228,6 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 .fc td.ride.l1 span { background: #f2c037; }
 .fc td.ride.l2 span { background: #ef4d43; }
 .fc td.c.up { box-shadow: inset 0 -3px 0 rgba(0,0,0,.45); }
-.ride-sum { font-size: 13px; font-weight: 600; }
-.ride-sum.l0 { color: #3ccf6e; }
-.ride-sum.l2 { color: #ff8f80; }
 
 /* Seçili bölge: daha büyük etiket + vurgu çerçevesi */
 .pin.sel .pill { font-size: 14px; line-height: 20px; box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0,0,0,.5); }
@@ -256,3 +253,6 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 }
 .srcbar .source { display: block; margin: 0; text-align: center; font-size: 12px; }
 .modelbar { padding-top: 0; padding-bottom: 6px; }
+
+/* Gün satırı: en düşük / en yüksek sıcaklık */
+.dayinfo b.tb sup { font-size: 9px; vertical-align: 5px; margin-left: 1px; }

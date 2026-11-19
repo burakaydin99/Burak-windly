@@ -634,37 +634,24 @@
     const p = day.rows[0].p;
     const now = Date.now();
     const isToday = p.key === tparts(now, loc.tz).key;
-    const sun = sunTimes(Date.UTC(p.y, p.mo - 1, p.d, 12), loc.lat, loc.lon);
     const maxWs = Math.max(...day.rows.map(r => r.ws ?? 0));
     const shortDay = { Mon: 'Pzt', Tue: 'Sal', Wed: 'Çar', Thu: 'Per', Fri: 'Cum', Sat: 'Cmt', Sun: 'Paz' };
     const maxWg = Math.max(...day.rows.map(r => r.wg ?? 0));
     const rain = day.rows.reduce((s, r) => s + (r.precip || 0), 0);
+    const temps = day.rows.map(r => r.temp).filter(t => t != null);
+    const tMin = temps.length ? Math.round(Math.min(...temps)) : null, tMax = temps.length ? Math.round(Math.max(...temps)) : null;
+    const tBox = v => `<b class="tb" style="background:${tempColor(v)}">${v}<sup>°</sup></b>`;
     $('#dayInfo').innerHTML =
       `<span class="t${isToday ? ' is-today' : ''}"${isToday ? ' title="Bugün"' : ''}>${shortDay[p.wd] || p.wd} ${p.d} ${TR_MON[p.mo - 1]}</span>` +
       `<span><b style="background:${windColor(maxWs)}">${windVal(maxWs)}</b>/<b style="background:${windColor(maxWg)}">${windVal(maxWg)}</b></span>` +
-      (rain >= 0.1 && !state.motor ? `<span class="m">💧${rain.toFixed(1)}</span>` : '') +
-      (state.motor ? rideSummary(day.rows) : sun ? `<span class="m">☀${hhmm(sun.rise, loc.tz)}–${hhmm(sun.set, loc.tz)}</span>` : '');
+      (tMin != null ? `<span title="Günün en düşük / en yüksek sıcaklığı">${tBox(tMin)}/${tBox(tMax)}</span>` : '') +
+      (rain >= 0.1 ? `<span class="m">💧${rain.toFixed(1)}</span>` : '');
 
     if (resetFocus) {
       // Bugünse şimdiki saat, değilse öğlen
       state.focusT = isToday ? null : day.rows.reduce((a, b) => Math.abs(b.p.h - 12) < Math.abs(a.p.h - 12) ? b : a).t;
     }
     renderTable(day.rows, loc);
-  }
-
-  // Gündüz saatlerinde en uzun "uygun" aralık
-  function rideSummary(rows) {
-    const now = Date.now(), stepMs = state.step * 3600e3;
-    let best = null, cur = null;
-    for (const r of rows) {
-      const ok = r.day && rideLevel(r) === 0 && r.t + stepMs > now;
-      if (ok) { cur = cur ? { ...cur, b: r } : { a: r, b: r }; if (!best || cur.b.t - cur.a.t > best.b.t - best.a.t) best = cur; }
-      else cur = null;
-    }
-    const h = r => String(r.p.h).padStart(2, '0');
-    if (!best) return '<span class="ride-sum l2" title="Bugün uygun saat yok">🏍 ✗</span>';
-    const end = (best.b.p.h + state.step) % 24;
-    return `<span class="ride-sum l0" title="En uzun uygun aralık">🏍 ${h(best.a)}–${String(end).padStart(2, '0')}</span>`;
   }
 
   function renderTable(rows, loc) {
