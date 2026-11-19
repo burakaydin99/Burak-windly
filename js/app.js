@@ -526,14 +526,22 @@
 
   // Tüm bölgelerin verisini çek (işaret ve rozetler için)
   async function loadAll({ force = false } = {}) {
-    await Promise.all(state.locs.map(l => getForecast(l, state.model, { force }).then(d => { l._data = d; }).catch(() => { l._data = null; })));
+    // Motor modunda harita etiketleri de tablodaki gibi tüm kaynakların en yüksek hamlesini gösterir
+    await Promise.all(state.locs.map(async l => {
+      try {
+        const d = await getForecast(l, state.model, { force });
+        l._data = state.motor ? applyGustEnsemble(d, await getGustEnsemble(l, { force })) : d;
+      } catch { l._data = null; }
+    }));
     paintBadges();
   }
   // Rozet ve işaretlerde odak zamanındaki (varsayılan: şimdi) rüzgarı göster
   function paintBadges() {
     const t = state.focusT ?? Date.now();
     for (const l of state.locs) {
-      l._r = l._data?.hours?.length ? nearest(l._data.hours, t) : null;
+      // Tablodaki hücreyle birebir aynı değer: aynı adım (1s/3s) ve aynı birleştirme (3 saatin en yüksek hamlesi)
+      if (l._data?.hours?.length && (l._rowsFor !== l._data || l._rowsStep !== state.step)) { l._rows = buildRows(l._data, l); l._rowsFor = l._data; l._rowsStep = state.step; }
+      l._r = l._rows?.length ? nearest(l._rows, t) : null;
     }
     renderMarkers();
   }
@@ -578,7 +586,6 @@
     try {
       const data = await getForecast(loc, state.model, { force });
       if (reqId !== load.req) return;
-      loc._data = data;
       const model = MODELS.find(m => m.id === state.model);
       let shown = data;
       if (state.motor) {
@@ -586,6 +593,7 @@
         if (reqId !== load.req) return;
         shown = applyGustEnsemble(data, ens);
       }
+      loc._data = shown;   // harita etiketi tabloyla aynı veriyi kullansın
       state.rows = buildRows(shown, loc);
       state.days = [];
       for (const r of state.rows) {
@@ -822,7 +830,7 @@
       syncSeg('motorSeg', state.motor ? 'on' : 'off');
       $('#mWarn').value = state.motorWarn; $('#mRisk').value = state.motorRisk;
     };
-    const setMotor = on => { state.motor = on; store.set('motor', on); syncMotor(); load(); };
+    const setMotor = on => { state.motor = on; store.set('motor', on); syncMotor(); refresh(); };
     $('#motorSeg').addEventListener('click', e => { const v = e.target.dataset.v; if (v) setMotor(v === 'on'); });
     ['mWarn', 'mRisk'].forEach(id => $('#' + id).addEventListener('change', () => {
       const w = +$('#mWarn').value, r = +$('#mRisk').value;
