@@ -520,7 +520,6 @@
       b.addEventListener('click', () => selectLoc(l.id));
       bar.append(b);
     }
-    bar.append(el('button', { class: 'chip add', onclick: openAdd, title: 'Bölge ekle', 'aria-label': 'Bölge ekle' }, '+'));
     bar.querySelector('.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
     paintBadges();
   }
@@ -804,6 +803,7 @@
 
   // ---------- Olaylar ----------
   function bind() {
+    $('#addBtn').addEventListener('click', openAdd);
     $('#refreshBtn').addEventListener('click', () => refresh({ force: true }));
     $('#prevDay').addEventListener('click', () => changeDay(-1));
     $('#nextDay').addEventListener('click', () => changeDay(1));
