@@ -29,6 +29,7 @@
     step: store.get('step', 3),
     source: store.get('source', 'openmeteo'),
     ipKey: store.get('ipKey', ''),
+    ipProxy: store.get('ipProxy', ''),
     rows: [],          // seçili bölgenin tüm satırları (7 gün)
     days: [],          // [{key, rows}]
     dayKey: null,      // gösterilen gün (null = bugün)
@@ -185,18 +186,28 @@
   // hourly[]: time (unix sn), windSpeed / windGust (m/sn, units=metric), windBearing (°),
   // temperature (°C), precipIntensity (mm/saat), cloudCover (0–1), humidity (0–1).
   // Not: 48 saatten uzun tahmin istek başına 3 kredi harcar.
-  const IP_BASE = 'https://api.infoplaza.com/v1/weather/forecast';
-  const ipUrl = (loc, key) => `${IP_BASE}?${new URLSearchParams({
-    lat: loc.lat, lon: loc.lon, api_key: key, units: 'metric', language: 'en',
-    max_hourly: 24 * FORECAST_DAYS, max_minutely: 0, max_daily: 0, max_daypartly: 0,
-  })}`;
+  // Infoplaza tarayıcıdan doğrudan çağrıya (CORS) izin vermediği için istekler
+  // kullanıcının Cloudflare Worker aracı sunucusundan geçer (proxy/infoplaza-worker.js).
+  const IP_PATH = '/v1/weather/forecast';
+  function ipUrl(loc) {
+    const base = (state.ipProxy || 'https://api.infoplaza.com').trim().replace(/\/+$/, '');
+    const q = {
+      lat: loc.lat, lon: loc.lon, units: 'metric', language: 'en',
+      max_hourly: 24 * FORECAST_DAYS, max_minutely: 0, max_daily: 0, max_daypartly: 0,
+    };
+    if (state.ipKey) q.api_key = state.ipKey;
+    return `${base}${IP_PATH}?${new URLSearchParams(q)}`;
+  }
 
   async function fetchInfoplaza(loc) {
-    const key = state.ipKey;
-    if (!key) throw new Error('Ayarlar’da Infoplaza api_key girilmemiş');
+    if (!state.ipProxy && !state.ipKey) throw new Error('Ayarlar’da aracı sunucu adresi veya api_key girilmemiş');
     let res;
-    try { res = await fetch(ipUrl(loc, key), { cache: 'no-store', headers: { Accept: 'application/json' } }); }
-    catch { throw new Error('Infoplaza’ya bağlanılamadı (ağ veya tarayıcı/CORS engeli)'); }
+    try { res = await fetch(ipUrl(loc), { cache: 'no-store' }); }
+    catch {
+      throw new Error(state.ipProxy
+        ? 'Aracı sunucuya bağlanılamadı — Worker adresini kontrol et'
+        : 'Infoplaza tarayıcıdan doğrudan çağrılmaya izin vermiyor (CORS). Ayarlar’a aracı sunucu (Worker) adresini gir.');
+    }
     let j = null;
     try { j = await res.json(); } catch { /* yoksay */ }
     if (!res.ok || j?.success === false) {
@@ -673,7 +684,11 @@
       $('#ipBox').hidden = state.source !== 'infoplaza';
       $('#srcHintOm').hidden = state.source === 'infoplaza';
     };
-    $('#settingsBtn').addEventListener('click', () => { syncSrc(); $('#ipKey').value = state.ipKey; $('#ipOut').hidden = true; });
+    $('#settingsBtn').addEventListener('click', () => { syncSrc(); $('#ipKey').value = state.ipKey; $('#ipProxy').value = state.ipProxy; $('#ipOut').hidden = true; });
+    $('#ipProxy').addEventListener('change', e => {
+      state.ipProxy = e.target.value.trim(); store.set('ipProxy', state.ipProxy); memCache.clear();
+      if (state.source === 'infoplaza') refresh({ force: true });
+    });
     $('#srcSeg').addEventListener('click', e => {
       const v = e.target.dataset.v; if (!v) return;
       state.source = v; store.set('source', v); syncSrc(); renderModels(); refresh({ force: true });
@@ -684,6 +699,7 @@
     });
     $('#ipTest').addEventListener('click', async () => {
       state.ipKey = $('#ipKey').value.trim(); store.set('ipKey', state.ipKey);
+      state.ipProxy = $('#ipProxy').value.trim(); store.set('ipProxy', state.ipProxy);
       const out = $('#ipOut');
       out.hidden = false; out.className = 'ip-out'; out.textContent = 'Test ediliyor…';
       const loc = curLoc() || { lat: 41.0, lon: 29.0 };
