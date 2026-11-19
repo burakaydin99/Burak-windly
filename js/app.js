@@ -28,7 +28,7 @@
     unit: store.get('unit', 'kmh'),
     step: store.get('step', 3),
     source: store.get('source', 'openmeteo'),
-    ip: store.get('ip', { url: '', token: '', windUnit: 'ms' }),
+    ipKey: store.get('ipKey', ''),
     rows: [],          // seçili bölgenin tüm satırları (7 gün)
     days: [],          // [{key, rows}]
     dayKey: null,      // gösterilen gün (null = bugün)
@@ -180,138 +180,45 @@
   }
 
 
-  // ---------- Infoplaza (kullanıcının hesabıyla) ----------
-  // Kullanıcının yapıştırdığı örnek istek adresinden seçili bölge için URL üret.
-  function ipBuildUrl(loc) {
-    const cfg = state.ip;
-    let raw = (cfg.url || '').trim();
-    if (!raw) throw new Error('Ayarlar’da Infoplaza istek adresi boş');
-    raw = raw.replace(/\{lat\}/gi, loc.lat).replace(/\{lon\}|\{lng\}/gi, loc.lon).replace(/\{token\}/gi, encodeURIComponent(cfg.token || ''));
-    const u = new URL(raw);
-    const keys = [...u.searchParams.keys()];
-    const latK = keys.find(k => /^(lat|latitude)$/i.test(k));
-    const lonK = keys.find(k => /^(lon|lng|long|longitude)$/i.test(k));
-    if (latK) u.searchParams.set(latK, loc.lat);
-    if (lonK) u.searchParams.set(lonK, loc.lon);
-    if (!latK && !lonK && !/\{lat\}/i.test(cfg.url)) {
-      // Koordinatlar yolun içinde olabilir: …/52.1,5.2 veya …/52.1/5.2
-      const m = u.pathname.match(/(-?\d{1,2}\.\d+)([,/])(-?\d{1,3}\.\d+)/);
-      if (m) u.pathname = u.pathname.replace(m[0], `${loc.lat}${m[2]}${loc.lon}`);
-      else { u.searchParams.set('latitude', loc.lat); u.searchParams.set('longitude', loc.lon); }
-    }
-    if (cfg.token) {
-      const tk = keys.find(k => /^(api_key|apikey|token|key|access_token)$/i.test(k));
-      u.searchParams.set(tk || 'api_key', cfg.token); // Infoplaza: api_key
-    }
-    return u.toString();
-  }
+  // ---------- Infoplaza Platform Weather API ----------
+  // GET https://api.infoplaza.com/v1/weather/forecast — Infoplaza "Optimal" modeli, 7 gün saatlik.
+  // hourly[]: time (unix sn), windSpeed / windGust (m/sn, units=metric), windBearing (°),
+  // temperature (°C), precipIntensity (mm/saat), cloudCover (0–1), humidity (0–1).
+  // Not: 48 saatten uzun tahmin istek başına 3 kredi harcar.
+  const IP_BASE = 'https://api.infoplaza.com/v1/weather/forecast';
+  const ipUrl = (loc, key) => `${IP_BASE}?${new URLSearchParams({
+    lat: loc.lat, lon: loc.lon, api_key: key, units: 'metric', language: 'en',
+    max_hourly: 24 * FORECAST_DAYS, max_minutely: 0, max_daily: 0, max_daypartly: 0,
+  })}`;
 
-  const norm = k => k.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const FIELD_RULES = {
-    t:      k => /^(time|date|datetime|validtime|validdate|timestamp|dt|ts|utc|localtime|forecasttime|validfrom|from|start|starttime|period)$/.test(k) || /(time|date)$/.test(k) && !/sun|moon|run|issue|created|updated|model/.test(k),
-    wg:     k => /gust/.test(k) && !/dir|bearing/.test(k),
-    wd:     k => /(wind)?(bearing|direction|dir)$/.test(k) && !/gust/.test(k) || k === 'winddirection' || k === 'wdir',
-    ws:     k => /^(windspeed|wind|ws|windspd|windspeed10m|wspd|speed)$/.test(k) || /wind.*(speed|spd)/.test(k) && !/gust|max/.test(k),
-    temp:   k => /^(temp|temperature|t2m|airtemperature|temperature2m|tmp)$/.test(k) || /temp/.test(k) && !/feel|dew|apparent|min|max|sea|water|soil|wetbulb|chill/.test(k),
-    precip: k => /(precip|rain)/.test(k) && !/prob|chance|pct|percent|type|duration|hours/.test(k),
-    cloud:  k => /cloud/.test(k) && !/base|type/.test(k),
-    rh:     k => /humid/.test(k),
-  };
-  const numOf = v => {
-    if (v == null) return null;
-    if (typeof v === 'object') v = v.value ?? v.val ?? v.avg ?? v.mean ?? null;
-    const n = typeof v === 'string' ? parseFloat(v) : v;
-    return typeof n === 'number' && isFinite(n) ? n : null;
-  };
-  const timeOf = v => {
-    if (v == null) return null;
-    if (typeof v === 'object') v = v.value ?? v.utc ?? v.iso ?? null;
-    if (typeof v === 'number') return v < 1e12 ? v * 1000 : v;
-    const ms = Date.parse(v);
-    return isNaN(ms) ? null : ms;
-  };
-
-  // JSON içinde zaman serisi tablosunu bul: nesne dizisi veya eşit uzunlukta dizilerden oluşan sütunlar.
-  function ipFindSeries(j) {
-    const cands = [];
-    const walk = (o, path, depth) => {
-      if (!o || typeof o !== 'object' || depth > 6) return;
-      if (Array.isArray(o)) {
-        if (o.length >= 2 && o.every(x => x && typeof x === 'object' && !Array.isArray(x))) cands.push({ kind: 'rows', rows: o, path });
-        o.slice(0, 3).forEach((x, i) => walk(x, `${path}[${i}]`, depth + 1));
-        return;
-      }
-      const arrKeys = Object.keys(o).filter(k => Array.isArray(o[k]) && o[k].length >= 2 && o[k].every(x => x == null || typeof x !== 'object' || ('value' in x)));
-      if (arrKeys.length >= 3) {
-        const n = Math.max(...arrKeys.map(k => o[k].length));
-        const rows = Array.from({ length: n }, (_, i) => Object.fromEntries(arrKeys.map(k => [k, o[k][i]])));
-        cands.push({ kind: 'cols', rows, path });
-      }
-      for (const k of Object.keys(o)) walk(o[k], path ? `${path}.${k}` : k, depth + 1);
-    };
-    walk(j, '', 0);
-    let best = null;
-    for (const c of cands) {
-      const flat = c.rows.map(r => flatten(r));
-      const map = mapFields(flat);
-      const score = (map.t ? 10 : 0) + (map.ws ? 10 : 0) + Object.keys(map).length + Math.min(c.rows.length, 400) / 100;
-      if (map.t && map.ws && (!best || score > best.score)) best = { ...c, flat, map, score };
-    }
-    return best;
-  }
-  // İç içe nesneleri tek seviyeye indir: {wind:{speed:3}} → {windspeed:3}
-  function flatten(o, pre = '', out = {}) {
-    for (const [k, v] of Object.entries(o)) {
-      const nk = pre + norm(k);
-      if (v && typeof v === 'object' && !Array.isArray(v) && !('value' in v)) flatten(v, nk, out);
-      else out[nk] = v;
-    }
-    return out;
-  }
-  function mapFields(flat) {
-    const keys = [...new Set(flat.slice(0, 5).flatMap(Object.keys))];
-    const map = {};
-    for (const f of ['t', 'wg', 'wd', 'ws', 'temp', 'precip', 'cloud', 'rh']) {
-      const used = new Set(Object.values(map));
-      const k = keys.find(k => !used.has(k) && FIELD_RULES[f](k) && (f === 't' ? flat.some(r => timeOf(r[k]) != null) : flat.some(r => numOf(r[k]) != null)));
-      if (k) map[f] = k;
-    }
-    return map;
-  }
-
-  async function fetchInfoplaza(loc, { raw = false } = {}) {
-    const url = ipBuildUrl(loc);
+  async function fetchInfoplaza(loc) {
+    const key = state.ipKey;
+    if (!key) throw new Error('Ayarlar’da Infoplaza api_key girilmemiş');
     let res;
-    try { res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } }); }
-    catch (e) { throw new Error('Bağlantı kurulamadı (ağ veya CORS engeli)'); }
-    const text = await res.text();
-    if (!res.ok) throw new Error(`Infoplaza HTTP ${res.status}${text ? ': ' + text.slice(0, 160) : ''}`);
-    let j;
-    try { j = JSON.parse(text); } catch { throw new Error('Yanıt JSON değil: ' + text.slice(0, 120)); }
-    const series = ipFindSeries(j);
-    if (!series) throw new Error('Yanıtta zaman + rüzgar hızı içeren bir seri bulunamadı');
-    const m = series.map;
-    const wf = { ms: 3.6, kmh: 1, kt: 1.852 }[state.ip.windUnit || 'ms'];
-    const hours = series.flat.map(r => {
-      const temp = numOf(r[m.temp]);
-      const ws = numOf(r[m.ws]), wg = numOf(r[m.wg]);
-      let cloud = numOf(r[m.cloud]);
-      if (cloud != null && cloud <= 8 && /okta/.test(m.cloud)) cloud = cloud / 8 * 100;
-      else if (cloud != null && cloud <= 1 && series.flat.every(x => (numOf(x[m.cloud]) ?? 0) <= 1)) cloud *= 100;
-      return {
-        t: timeOf(r[m.t]),
-        ws: ws != null ? ws * wf : null,
-        wg: wg != null ? wg * wf : null,
-        wd: numOf(r[m.wd]),
-        temp: temp != null && temp > 150 ? temp - 273.15 : temp,
-        precip: numOf(r[m.precip]),
-        cloud, rh: numOf(r[m.rh]),
-      };
-    }).filter(r => r.t != null && r.ws != null).sort((a, b) => a.t - b.t);
-    if (!hours.length) throw new Error('Seride geçerli satır yok');
-    const out = { hours, tz: null, source: 'Infoplaza' };
-    if (raw) out.debug = { url, path: series.path || '(kök)', map: m, sample: series.rows[0], n: hours.length };
-    return out;
+    try { res = await fetch(ipUrl(loc, key), { cache: 'no-store', headers: { Accept: 'application/json' } }); }
+    catch { throw new Error('Infoplaza’ya bağlanılamadı (ağ veya tarayıcı/CORS engeli)'); }
+    let j = null;
+    try { j = await res.json(); } catch { /* yoksay */ }
+    if (!res.ok || j?.success === false) {
+      const why = j?.message || j?.error?.message || j?.error || j?.meta?.message || '';
+      const hint = { 401: 'api_key geçersiz', 403: 'yetki yok', 429: 'kredi/limit aşıldı', 404: 'bulunamadı' }[res.status] || '';
+      throw new Error(`Infoplaza ${res.status}${hint ? ' – ' + hint : ''}${why ? ': ' + String(why).slice(0, 120) : ''}`);
+    }
+    const d = j?.data ?? j;
+    const hourly = d?.hourly;
+    if (!Array.isArray(hourly) || !hourly.length) throw new Error('Infoplaza yanıtında saatlik veri yok');
+    const n = v => (typeof v === 'number' && isFinite(v) ? v : null);
+    const hours = hourly.map(h => ({
+      t: h.time * 1000,
+      ws: n(h.windSpeed) != null ? h.windSpeed * 3.6 : null,
+      wg: n(h.windGust) != null ? h.windGust * 3.6 : null,
+      wd: n(h.windBearing),
+      temp: n(h.temperature),
+      precip: n(h.precipIntensity),          // saatlik adımda mm/saat ≈ o saatin toplamı
+      cloud: n(h.cloudCover) != null ? h.cloudCover * 100 : null,
+      rh: n(h.humidity) != null ? h.humidity * 100 : null,
+    })).filter(r => r.ws != null && r.t).sort((a, b) => a.t - b.t);
+    return { hours, tz: typeof d.timezone === 'string' ? d.timezone : null, source: 'Infoplaza' };
   }
 
   // Aynı bölge için eşzamanlı istekleri tek istekte birleştir
@@ -766,34 +673,28 @@
       $('#ipBox').hidden = state.source !== 'infoplaza';
       $('#srcHintOm').hidden = state.source === 'infoplaza';
     };
-    $('#settingsBtn').addEventListener('click', () => {
-      syncSrc();
-      $('#ipUrl').value = state.ip.url || ''; $('#ipToken').value = state.ip.token || ''; $('#ipWindUnit').value = state.ip.windUnit || 'ms';
-      $('#ipOut').hidden = true;
-    });
+    $('#settingsBtn').addEventListener('click', () => { syncSrc(); $('#ipKey').value = state.ipKey; $('#ipOut').hidden = true; });
     $('#srcSeg').addEventListener('click', e => {
       const v = e.target.dataset.v; if (!v) return;
       state.source = v; store.set('source', v); syncSrc(); renderModels(); refresh({ force: true });
     });
-    const saveIp = () => {
-      state.ip = { url: $('#ipUrl').value.trim(), token: $('#ipToken').value.trim(), windUnit: $('#ipWindUnit').value };
-      store.set('ip', state.ip); memCache.clear();
-    };
-    ['ipUrl', 'ipToken', 'ipWindUnit'].forEach(id => $('#' + id).addEventListener('change', () => { saveIp(); if (state.source === 'infoplaza') refresh({ force: true }); }));
+    $('#ipKey').addEventListener('change', e => {
+      state.ipKey = e.target.value.trim(); store.set('ipKey', state.ipKey); memCache.clear();
+      if (state.source === 'infoplaza') refresh({ force: true });
+    });
     $('#ipTest').addEventListener('click', async () => {
-      saveIp();
+      state.ipKey = $('#ipKey').value.trim(); store.set('ipKey', state.ipKey);
       const out = $('#ipOut');
       out.hidden = false; out.className = 'ip-out'; out.textContent = 'Test ediliyor…';
       const loc = curLoc() || { lat: 41.0, lon: 29.0 };
       try {
-        const d = await fetchInfoplaza(loc, { raw: true });
-        const f = d.hours[0], names = { t: 'zaman', ws: 'rüzgar', wg: 'hamle', wd: 'yön', temp: 'sıcaklık', precip: 'yağış', cloud: 'bulut', rh: 'nem' };
+        const d = await fetchInfoplaza(loc);
+        const f = d.hours[0], l = d.hours[d.hours.length - 1];
         const fmt = v => v == null ? '–' : Math.round(v * 10) / 10;
-        out.textContent = `✓ ${d.debug.n} zaman adımı bulundu (${d.debug.path})\n` +
-          `İlk: ${new Date(f.t).toLocaleString('tr-TR')} → son: ${new Date(d.hours[d.hours.length - 1].t).toLocaleString('tr-TR')}\n\n` +
-          'Eşleşen alanlar:\n' + Object.entries(names).map(([k, n]) => `  ${n.padEnd(9)}: ${d.debug.map[k] || '(bulunamadı)'}`).join('\n') +
-          `\n\nİlk satır → rüzgar ${fmt(f.ws)} km/s, hamle ${fmt(f.wg)} km/s, yön ${fmt(f.wd)}°, ${fmt(f.temp)}°C, yağış ${fmt(f.precip)} mm\n\n` +
-          'Ham ilk kayıt:\n' + JSON.stringify(d.debug.sample, null, 1).slice(0, 800);
+        out.textContent = `✓ Bağlantı tamam — ${d.hours.length} saatlik veri\n` +
+          `${new Date(f.t).toLocaleString('tr-TR')} → ${new Date(l.t).toLocaleString('tr-TR')}\n` +
+          `İlk saat: rüzgar ${fmt(f.ws)} km/s, hamle ${fmt(f.wg)} km/s, yön ${fmt(f.wd)}°, ${fmt(f.temp)}°C, yağış ${fmt(f.precip)} mm`;
+        memCache.clear(); if (state.source === 'infoplaza') refresh({ force: true });
       } catch (e) {
         out.className = 'ip-out err';
         out.textContent = '✗ ' + e.message;

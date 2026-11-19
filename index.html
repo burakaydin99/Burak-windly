@@ -114,18 +114,14 @@
     </p>
     <div id="ipBox" hidden>
       <p class="hint">
-        Infoplaza hesabındaki dokümanda veya panelde bulunan <b>forecast (tahmin) isteğinin örnek adresini</b> aşağıya yapıştır.
-        Uygulama adresteki enlem/boylamı seçili bölgeyle değiştirir ve yanıttaki rüzgar, hamle, yön, sıcaklık ve yağış alanlarını kendisi bulur.
-        Adreste <code>{lat}</code>, <code>{lon}</code> ve <code>{token}</code> yer tutucularını da kullanabilirsin.
+        Infoplaza Platform hesabındaki <b>api_key</b>'i gir. Veriler Infoplaza'nın <b>Optimal</b> modelinden, 7 gün saatlik olarak gelir
+        (<code>/v1/weather/forecast</code>). Her bölge için yenileme başına 3 kredi harcanır; veriler 30 dk önbellekte tutulur.
       </p>
-      <textarea id="ipUrl" rows="3" placeholder="https://api.infoplaza.com/…?latitude=…&amp;longitude=…&amp;api_key=…" spellcheck="false"></textarea>
-      <input id="ipToken" type="password" placeholder="api_key (adreste yoksa)" autocomplete="off" spellcheck="false">
-      <div class="ip-row">
-        <label>Rüzgar birimi (kaynak)</label>
-        <select id="ipWindUnit">
-          <option value="ms">m/sn</option><option value="kmh">km/s</option><option value="kt">knot</option>
-        </select>
-      </div>
+      <input id="ipKey" type="password" placeholder="api_key" autocomplete="off" spellcheck="false">
+      <button class="btn primary" id="ipTest">Bağlantıyı test et</button>
+      <pre class="ip-out" id="ipOut" hidden></pre>
+      <p class="hint">Infoplaza'dan veri alınamazsa uygulama otomatik olarak Open-Meteo'ya geçer ve bunu üstte belirtir.</p>
+    </div>
       <button class="btn primary" id="ipTest">Bağlantıyı test et</button>
       <pre class="ip-out" id="ipOut" hidden></pre>
       <p class="hint">Infoplaza'dan veri alınamazsa uygulama otomatik olarak Open-Meteo'ya geçer ve bunu üstte belirtir.</p>

@@ -21,12 +21,14 @@ Windy / Windguru tarzı, telefona uygun bir rüzgar tahmin uygulaması.
 ## Veri kaynakları (Ayarlar → Veri kaynağı)
 
 1. **Open-Meteo** (varsayılan): API anahtarı gerektirmez, veriler canlı gelir. Windy'nin de kullandığı GFS, ECMWF ve ICON modellerini sunar.
-2. **Infoplaza**: Kendi hesabınla çalışır. Kurulumu:
-   - Infoplaza dokümanındaki veya panelindeki forecast isteğinin örnek adresini yapıştır.
-   - Token adreste yoksa ayrı alana gir. Adreste `{lat}`, `{lon}` ve `{token}` yer tutucuları da kullanılabilir.
-   - Uygulama adresteki enlem/boylamı her bölge için değiştirir. Yanıttaki zaman, rüzgar, hamle, yön, sıcaklık, yağış, bulut ve nem alanlarını kendisi bulur.
-   - “Bağlantıyı test et” düğmesi bulunan alanları ve ilk satırın değerlerini gösterir. Kaynağın rüzgar birimi (varsayılan m/sn) ayarlardan değiştirilebilir.
-   - Infoplaza'dan veri alınamazsa uygulama Open-Meteo'ya geçer ve bunu üstte belirtir.
+2. **Infoplaza**: Ayarlar'a Infoplaza Platform hesabının `api_key`'i girilir. Veriler `GET https://api.infoplaza.com/v1/weather/forecast` adresinden Infoplaza'nın Optimal modeliyle, 7 gün saatlik (`max_hourly=168`) olarak gelir. Kullanılan alanlar:
+   - `windSpeed`, `windGust`: m/sn, uygulamada seçilen birime çevrilir.
+   - `windBearing`: rüzgar yönü.
+   - `temperature`: sıcaklık.
+   - `precipIntensity`: yağış, mm/saat.
+   - `cloudCover`, `humidity`: bulut ve nem.
+
+   48 saatten uzun tahmin, her bölge ve her yenileme için 3 kredi harcar. Bu yüzden veriler 30 dakika önbellekte tutulur. “Bağlantıyı test et” düğmesi anahtarı dener. Infoplaza'dan veri alınamazsa uygulama Open-Meteo'ya geçer ve bunu üstte belirtir.
 
 Yenile'ye basıldığında tüm kayıtlı bölgelerin 7 günlük tahmini yeniden alınır. İnternet yoksa en son çekilen veri “çevrimdışı” etiketiyle gösterilir. Kayıtlı bölgeler, ayarlar ve token tarayıcıda (localStorage) saklanır.
 
