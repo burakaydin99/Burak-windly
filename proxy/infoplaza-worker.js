@@ -8,7 +8,7 @@
  * Kurulum: Cloudflare → Workers & Pages → Create → Worker → bu kodu yapıştır → Deploy
  *          Settings → Variables and Secrets → Add → Secret: INFOPLAZA_KEY = <api_key>
  */
-const ALLOWED_ORIGINS = ['https://burakaydin99.github.io'];
+const ALLOWED_ORIGINS = ['https://burakaydin99.github.io', 'https://w.burakaydin.one'];
 const ALLOWED_PATHS = /^\/v1\/weather\/(forecast|timeseries\/(point|models))$/;
 const CACHE_SECONDS = 600; // aynı istek 10 dk içinde tekrar gelirse kredi harcanmaz
 

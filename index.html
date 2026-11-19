@@ -11,7 +11,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="css/style.css?v=11">
+  <link rel="stylesheet" href="css/style.css?v=12">
 </head>
 <body>
   <!-- Üst satır: kayıtlı bölgeler + yenile + ayarlar -->
@@ -99,6 +99,15 @@
 
     <h3>Bölgeler</h3>
     <ul id="locEditList" class="edit-list"></ul>
+    <div class="row-btns">
+      <button class="btn" id="locExport">Bölgeleri kopyala</button>
+      <button class="btn" id="locImportBtn">İçe aktar</button>
+    </div>
+    <div id="locImportBox" hidden>
+      <textarea id="locImportTxt" rows="3" placeholder='Kopyaladığın listeyi buraya yapıştır: [{"name":"…","lat":…,"lon":…}]' spellcheck="false"></textarea>
+      <button class="btn primary" id="locImportDo">Ekle</button>
+    </div>
+    <p class="hint" id="locIoHint">Bölgeler bu tarayıcıda saklanır. Başka bir cihaza veya yeni adrese taşımak için kopyala → orada içe aktar.</p>
 
     <h3>Motor modu</h3>
     <div class="seg" id="motorSeg"><button data-v="off">Kapalı</button><button data-v="on">Açık</button></div>
@@ -151,6 +160,6 @@
   </dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="js/app.js?v=11"></script>
+  <script src="js/app.js?v=12"></script>
 </body>
 </html>
