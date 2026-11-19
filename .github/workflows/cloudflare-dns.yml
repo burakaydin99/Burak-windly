@@ -1,0 +1,37 @@
+name: Cloudflare DNS (w.burakaydin.one)
+# w.burakaydin.one → burakaydin99.github.io CNAME kaydını oluşturur/günceller.
+# Gerekli: repo Settings → Secrets and variables → Actions → CLOUDFLARE_API_TOKEN
+# (Cloudflare → My Profile → API Tokens → "Edit zone DNS" şablonu, yalnızca burakaydin.one bölgesi)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  dns:
+    runs-on: ubuntu-latest
+    env:
+      CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      ZONE: burakaydin.one
+      NAME: w.burakaydin.one
+      TARGET: burakaydin99.github.io
+    steps:
+      - name: CNAME kaydını oluştur / güncelle
+        run: |
+          set -euo pipefail
+          [ -n "$CF_TOKEN" ] || { echo "CLOUDFLARE_API_TOKEN tanımlı değil"; exit 1; }
+          api() { curl -sS -H "Authorization: Bearer $CF_TOKEN" -H "Content-Type: application/json" "$@"; }
+          ZID=$(api "https://api.cloudflare.com/client/v4/zones?name=$ZONE" | jq -r '.result[0].id // empty')
+          [ -n "$ZID" ] || { echo "Bölge bulunamadı: token $ZONE için yetkili mi?"; exit 1; }
+          RID=$(api "https://api.cloudflare.com/client/v4/zones/$ZID/dns_records?name=$NAME" | jq -r '.result[0].id // empty')
+          BODY=$(jq -nc --arg n "$NAME" --arg t "$TARGET" '{type:"CNAME",name:$n,content:$t,proxied:false,ttl:1,comment:"Rüzgar Takip — GitHub Pages"}')
+          if [ -n "$RID" ]; then
+            R=$(api -X PUT "https://api.cloudflare.com/client/v4/zones/$ZID/dns_records/$RID" --data "$BODY")
+          else
+            R=$(api -X POST "https://api.cloudflare.com/client/v4/zones/$ZID/dns_records" --data "$BODY")
+          fi
+          echo "$R" | jq '{success, errors, record: (.result | {name, type, content, proxied})}'
+          [ "$(echo "$R" | jq -r .success)" = "true" ]
+      - name: Kontrol (DNS)
+        run: |
+          sleep 20
+          dig +short CNAME "$NAME" @1.1.1.1 || true
