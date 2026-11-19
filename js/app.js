@@ -200,8 +200,8 @@
       else { u.searchParams.set('latitude', loc.lat); u.searchParams.set('longitude', loc.lon); }
     }
     if (cfg.token) {
-      const tk = keys.find(k => /^(token|apikey|api_key|key|access_token)$/i.test(k));
-      u.searchParams.set(tk || 'token', cfg.token);
+      const tk = keys.find(k => /^(api_key|apikey|token|key|access_token)$/i.test(k));
+      u.searchParams.set(tk || 'api_key', cfg.token); // Infoplaza: api_key
     }
     return u.toString();
   }
