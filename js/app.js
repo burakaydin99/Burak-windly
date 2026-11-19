@@ -640,8 +640,8 @@
     const rain = day.rows.reduce((s, r) => s + (r.precip || 0), 0);
     const temps = day.rows.map(r => r.temp).filter(t => t != null);
     const tMin = temps.length ? Math.round(Math.min(...temps)) : null, tMax = temps.length ? Math.round(Math.max(...temps)) : null;
-    // Tek dikdörtgen, iki renge bölünmüş: [sol – sağ]
-    const pair = (l, lc, r, rc, title) => `<span class="dbox" title="${title}"><b style="background:${lc}">${l}</b><i>–</i><b style="background:${rc}">${r}</b></span>`;
+    // Tek dikdörtgen, iki renge bölünmüş; ortada ince beyaz dikey çizgi
+    const pair = (l, lc, r, rc, title) => `<span class="dbox" title="${title}"><b style="background:${lc}">${l}</b><b style="background:${rc}">${r}</b></span>`;
     const deg = v => `${v}<sup>°</sup>`;
     $('#dayInfo').innerHTML =
       `<span class="t${isToday ? ' is-today' : ''}"${isToday ? ' title="Bugün"' : ''}>${shortDay[p.wd] || p.wd} ${p.d} ${TR_MON[p.mo - 1]}</span>` +
