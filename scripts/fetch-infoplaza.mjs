@@ -12,7 +12,7 @@ const locs = JSON.parse(await readFile(join(site, 'data/locations.json'), 'utf8'
 const outDir = join(site, 'data/infoplaza');
 await mkdir(outDir, { recursive: true });
 
-const KEEP = ['time', 'windSpeed', 'windGust', 'windBearing', 'temperature', 'precipIntensity', 'cloudCover', 'humidity'];
+const KEEP = ['time', 'windSpeed', 'windGust', 'windBearing', 'temperature', 'precipIntensity', 'precipProbability', 'cloudCover'];
 const index = { updatedAt: new Date().toISOString(), locations: [] };
 
 for (const l of locs) {

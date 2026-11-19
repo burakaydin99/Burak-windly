@@ -153,7 +153,9 @@ table.fc { min-width: 100%; border-collapse: separate; border-spacing: 0; font-v
 .fc td.rain.r1 { background: rgba(80,160,255,.25); }
 .fc td.rain.r2 { background: rgba(80,160,255,.5); }
 .fc td.rain.r3 { background: rgba(80,120,255,.8); }
-.fc td.rh { font-size: 14px; color: var(--muted); }
+.fc td.pp { font-size: 14px; color: var(--muted); }
+.fc td.pp.p1 { color: #9cc7ff; background: rgba(80,160,255,.18) !important; }
+.fc td.pp.p2 { color: #fff; background: rgba(80,140,255,.55) !important; font-weight: 600; }
 .fc tbody tr:nth-child(odd) td:not(.c):not(.lbl):not(.rain.r1):not(.rain.r2):not(.rain.r3) { background: rgba(0,0,0,.04); }
 
 /* Dialoglar */
