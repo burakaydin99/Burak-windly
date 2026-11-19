@@ -12,6 +12,7 @@
 
   const DEFAULT_LOCS = [
     { id: 'atasehir', name: 'Ataşehir', lat: 40.9923, lon: 29.1244, tz: 'Europe/Istanbul' },
+    { id: 'kopru-15-temmuz', name: '15 Temmuz Köprüsü', lat: 41.0455, lon: 29.0340, tz: 'Europe/Istanbul' },
   ];
 
   const MODELS = [
@@ -40,6 +41,15 @@
     focusT: null,      // pusula / işaretlerde gösterilen zaman (null = şimdi)
     picking: false,
   };
+  // Sonradan eklenen varsayılan bölgeler: listede (3 km içinde) yoksa bir kereye mahsus ekle
+  if (!store.get('seeded-kopru', false)) {
+    for (const d of DEFAULT_LOCS) {
+      const near = state.locs.some(l => Math.hypot(l.lat - d.lat, (l.lon - d.lon) * 0.75) < 0.03);
+      if (!near) state.locs.push({ ...d });
+    }
+    store.set('seeded-kopru', true);
+    store.set('locs', state.locs);
+  }
   if (!state.locs.find(l => l.id === state.sel)) state.sel = state.locs[0]?.id ?? null;
 
   const $ = s => document.querySelector(s);
