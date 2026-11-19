@@ -47,7 +47,7 @@ Harita düğmesinden dört görünüm seçilebilir: Koyu (varsayılan), Açık, 
 
 ## Yayın
 
-Uygulama `gh-pages` dalından GitHub Pages ile yayınlanır: https://burakaydin99.github.io/Burak-windly/
+Uygulama `gh-pages` dalından GitHub Pages ile yayınlanır: https://w.burakaydin.one (Cloudflare DNS: `w` CNAME → `burakaydin99.github.io`)
 
 ## Çalıştırma
 
