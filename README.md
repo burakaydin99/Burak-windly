@@ -20,14 +20,12 @@ Windy / Windguru tarzı, telefona uygun bir rüzgar tahmin uygulaması.
 
 ## Motor modu
 
-Ayarlar → Motor modu bölümünden açılır:
-- **Hamle▲ satırı**, o saat için tüm kaynakların en yüksek hamlesini gösterir. Kaynaklar GFS, ICON, ECMWF ve varsa Infoplaza. Hücreye dokununca her kaynağın değeri görünür. Seçili kaynaktan belirgin yüksekse hücrenin altında koyu bir çizgi olur.
-- **Sürüş satırı**, her saati renkle işaretler:
-  - 🟢 uygun
-  - 🟡 dikkat: hamle ≥ 40 km/s, yağış ≥ 0.2 mm/saat veya sıcaklık ≤ 3 °C
-  - 🔴 riskli: hamle ≥ 55 km/s veya yağış ≥ 1 mm/saat
+Ayarlar → Motor modu bölümünden açılır. Verileri değiştirmez; tabloya bir **sürüş satırı** ekler. Her saat, **seçili modelin** değerlerine göre işaretlenir:
+- 🟢 uygun
+- 🟡 dikkat: hamle ≥ 40 km/s, yağış ≥ 0.2 mm/saat veya sıcaklık ≤ 3 °C
+- 🔴 riskli: hamle ≥ 55 km/s veya yağış ≥ 1 mm/saat
 
-  Hamle eşikleri Ayarlar'dan değiştirilebilir.
+Hamle eşikleri Ayarlar'dan değiştirilebilir.
 
 ## Harita
 

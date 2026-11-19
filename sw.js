@@ -1,6 +1,6 @@
 // Uygulama kabuğunu önbelleğe alır; hava durumu API çağrıları her zaman ağdan gelir.
-const CACHE = 'ruzgar-v30';
-const SHELL = ['./', 'index.html', 'css/style.css?v=30', 'js/app.js?v=30', 'icon.svg', 'manifest.webmanifest',
+const CACHE = 'ruzgar-v31';
+const SHELL = ['./', 'index.html', 'css/style.css?v=31', 'js/app.js?v=31', 'icon.svg', 'manifest.webmanifest',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'];
 

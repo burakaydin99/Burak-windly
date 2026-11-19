@@ -11,7 +11,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="css/style.css?v=30">
+  <link rel="stylesheet" href="css/style.css?v=31">
 </head>
 <body>
   <!-- Üst satır: kayıtlı bölgeler + yenile + ayarlar -->
@@ -115,8 +115,8 @@
 
     <h3>Motor modu</h3>
     <div class="seg" id="motorSeg"><button data-v="off">Kapalı</button><button data-v="on">Açık</button></div>
-    <p class="hint">Hamle satırı tüm kaynakların (GFS, ICON, ECMWF, Infoplaza) <b>en yükseğini</b> gösterir; her saat için sürüş durumu
-      🟢 uygun / 🟡 dikkat / 🔴 riskli olarak işaretlenir. Yağış (≥0.2 mm/saat dikkat, ≥1 riskli) ve 3°C ve altı (buzlanma) da hesaba katılır.</p>
+    <p class="hint">Tabloya sürüş satırı eklenir: her saat 🟢 uygun / 🟡 dikkat / 🔴 riskli. Veriler değişmez; işaretler seçili modelin
+      hamle, yağış (≥0.2 mm/saat dikkat, ≥1 riskli) ve sıcaklık (3°C ve altı: buzlanma) değerlerinden hesaplanır.</p>
     <div class="manual-grid">
       <label class="fld" for="mWarn">🟡 Dikkat: hamle ≥ (km/s)</label><label class="fld" for="mRisk">🔴 Riskli: hamle ≥ (km/s)</label>
       <input id="mWarn" type="number" inputmode="numeric" min="10" max="150">
@@ -164,6 +164,6 @@
   </dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="js/app.js?v=30"></script>
+  <script src="js/app.js?v=31"></script>
 </body>
 </html>
