@@ -114,21 +114,23 @@
     </p>
     <div id="ipBox" hidden>
       <p class="hint">
-        Infoplaza Platform hesabındaki <b>api_key</b>'i gir. Veriler Infoplaza'nın <b>Optimal</b> modelinden, 7 gün saatlik olarak gelir
-        (<code>/v1/weather/forecast</code>). Her bölge için yenileme başına 3 kredi harcanır; veriler 30 dk önbellekte tutulur.
+        Infoplaza verisi (Optimal model, 7 gün saatlik) GitHub tarafından <b>3 saatte bir</b> otomatik çekilir ve
+        uygulamanın yanına konur; telefonda anahtar gerekmez. Hemen güncellemek için GitHub'da
+        <a href="https://github.com/burakaydin99/Burak-windly/actions/workflows/infoplaza.yml" target="_blank" rel="noopener">Infoplaza verisi → Run workflow</a>.
       </p>
-      <label class="fld" for="ipProxy">Aracı sunucu (Cloudflare Worker) adresi</label>
-      <input id="ipProxy" type="url" placeholder="https://infoplaza-proxy.….workers.dev" autocomplete="off" spellcheck="false">
-      <p class="hint">
-        Infoplaza tarayıcıdan doğrudan çağrılmaya izin vermediği için istekler bu aracı sunucudan geçer.
-        Kurulum adımları ve kod: <a href="https://github.com/burakaydin99/Burak-windly/blob/gh-pages/proxy/infoplaza-worker.js" target="_blank" rel="noopener">infoplaza-worker.js</a>.
-        api_key'i Worker'a gizli değişken olarak girdiysen aşağıdaki alanı boş bırakabilirsin.
-      </p>
-      <label class="fld" for="ipKey">api_key (Worker'da tanımlıysa boş bırak)</label>
-      <input id="ipKey" type="password" placeholder="api_key" autocomplete="off" spellcheck="false">
-      <button class="btn primary" id="ipTest">Bağlantıyı test et</button>
+      <pre class="ip-out" id="ipStatus">Durum yükleniyor…</pre>
+      <button class="btn" id="ipCopy">Bölge listemi kopyala</button>
+      <p class="hint" id="ipCopyHint">Infoplaza yalnızca listedeki bölgeler için çekilir. Yeni bölge eklediysen listeyi kopyalayıp Claude'a gönder.</p>
+      <button class="btn primary" id="ipTest">Bu bölgeyi test et</button>
       <pre class="ip-out" id="ipOut" hidden></pre>
-      <p class="hint">Infoplaza'dan veri alınamazsa uygulama otomatik olarak Open-Meteo'ya geçer ve bunu üstte belirtir.</p>
+      <details class="manual">
+        <summary>Gelişmiş: kendi aracı sunucum (Cloudflare Worker)</summary>
+        <label class="fld" for="ipProxy">Worker adresi (doldurulursa veriler buradan canlı alınır)</label>
+        <input id="ipProxy" type="url" placeholder="https://infoplaza-proxy.….workers.dev" autocomplete="off" spellcheck="false">
+        <label class="fld" for="ipKey">api_key (Worker'da tanımlıysa boş bırak)</label>
+        <input id="ipKey" type="password" placeholder="api_key" autocomplete="off" spellcheck="false">
+      </details>
+      <p class="hint">Infoplaza verisi alınamazsa uygulama Open-Meteo'ya geçer ve sebebini üstte yazar.</p>
     </div>
   </dialog>
 
