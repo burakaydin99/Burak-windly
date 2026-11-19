@@ -720,8 +720,18 @@
       state.focusT = r.t;
       fc.querySelectorAll('thead th.focus').forEach(x => x.classList.remove('focus'));
       fc.querySelector(`thead th[data-i="${rows.indexOf(r)}"]`)?.classList.add('focus');
+      markCol(rows.indexOf(r));
       paintBadges();
     });
+    markCol(focusIdx);
+  }
+
+  // Seçili saatin sütununu tüm satırlarda bir ton koyulaştır
+  function markCol(idx) {
+    const t = $('#forecast table');
+    if (!t) return;
+    t.querySelectorAll('.sel').forEach(c => c.classList.remove('sel'));
+    for (const tr of t.rows) tr.cells[idx + 1]?.classList.add('sel');
   }
 
   // ---------- Bölge ekleme ----------

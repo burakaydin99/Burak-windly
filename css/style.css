@@ -144,6 +144,9 @@ table.fc { min-width: 100%; border-collapse: separate; border-spacing: 0; font-v
 .fc thead th.night { background: var(--bg2); }
 .fc thead th.focus { box-shadow: inset 0 -4px 0 var(--accent); }
 .fc td.now, .fc th.now { box-shadow: inset 0 0 0 999px rgba(255,255,255,.06); }
+/* Seçili saat sütunu: hücreler bir ton koyu, saat başlığı daha koyu */
+.fc td.sel { box-shadow: inset 0 0 0 999px rgba(0,0,0,.22); }
+.fc thead th.sel { background: #131c25; }
 .fc thead th.now { color: var(--accent); }
 .fc td.c { font-size: 15px; color: #111; font-weight: 500; }
 .fc td.icon svg { width: 26px; height: 26px; }
