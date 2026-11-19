@@ -1,0 +1,15 @@
+name: Alan adı kontrolü (w.burakaydin.one)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "CNAME:"; dig +short CNAME w.burakaydin.one @1.1.1.1
+          echo "A:";     dig +short A w.burakaydin.one @1.1.1.1
+          echo "HTTP:";  curl -sS -o /dev/null -w "%{http_code} %{redirect_url}\n" http://w.burakaydin.one/ || true
+          echo "HTTPS:"; curl -sS -o /dev/null -w "%{http_code}\n" https://w.burakaydin.one/ || true
+          echo "github.io:"; curl -sS -o /dev/null -w "%{http_code} %{redirect_url}\n" https://burakaydin99.github.io/Burak-windly/ || true
