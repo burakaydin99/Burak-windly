@@ -12,8 +12,8 @@
 
   const DEFAULT_LOCS = [
     { id: 'atasehir', name: 'Ataşehir', lat: 40.9923, lon: 29.1244, tz: 'Europe/Istanbul' },
-    { id: 'kopru-15-temmuz', name: '1.Köprü', lat: 41.0455, lon: 29.0340, tz: 'Europe/Istanbul' },   // 15 Temmuz Şehitler
-    { id: 'kopru-fsm', name: '2.Köprü', lat: 41.0912, lon: 29.0612, tz: 'Europe/Istanbul' },           // Fatih Sultan Mehmet
+    { id: 'kopru-15-temmuz', name: '1.Köprü', lat: 41.0455, lon: 29.0340, tz: 'Europe/Istanbul', bridge: true },   // 15 Temmuz Şehitler
+    { id: 'kopru-fsm', name: '2.Köprü', lat: 41.0912, lon: 29.0612, tz: 'Europe/Istanbul', bridge: true },           // Fatih Sultan Mehmet
   ];
 
   const MODELS = [
@@ -51,6 +51,14 @@
       if (!near) state.locs.push({ ...d });
     }
     store.set('seeded-v2', true);
+    store.set('locs', state.locs);
+  }
+  // Köprü modu: varsayılan köprü noktalarına (2 km içinde) köprü işareti koy (bir kez)
+  if (!store.get('seeded-bridge', false)) {
+    for (const l of state.locs) {
+      if (DEFAULT_LOCS.some(d => d.bridge && Math.hypot(l.lat - d.lat, (l.lon - d.lon) * 0.75) < 0.02)) l.bridge = true;
+    }
+    store.set('seeded-bridge', true);
     store.set('locs', state.locs);
   }
   if (!state.locs.find(l => l.id === state.sel)) state.sel = state.locs[0]?.id ?? null;
@@ -274,12 +282,58 @@
   // Aynı bölge için eşzamanlı istekleri tek istekte birleştir
   const inflight = new Map();
   function getForecast(loc, modelId, opts = {}) {
-    const key = `${loc.lat},${loc.lon}|${state.source}|${modelId}|${opts.force ? 1 : 0}`;
+    const key = `${loc.lat},${loc.lon}|${state.source}|${modelId}|${loc.bridge ? 'b' : ''}|${opts.force ? 1 : 0}`;
     if (!inflight.has(key)) inflight.set(key, fetchForecast(loc, modelId, opts).finally(() => inflight.delete(key)));
     return inflight.get(key);
   }
 
-  async function fetchForecast(loc, modelId, { force = false } = {}) {
+  // ---------- Köprü modu: 80 m yükseklik rüzgarı ----------
+  // Köprü tabliyesi ~65 m yükseklikte. Her saat için GFS'nin 80 m / 10 m rüzgar oranı alınır ve
+  // seçili kaynağın rüzgar + hamlesine uygulanır (hamle için 80 m verisi yok; aynı oran kullanılır).
+  const BRIDGE_H = 80;
+  async function getHeightRatio(loc, { force = false } = {}) {
+    const key = `h80|${loc.lat},${loc.lon}`;
+    const c = memCache.get(key);
+    if (!force && c && Date.now() - c.at < CACHE_MS) return c.data;
+    const q = new URLSearchParams({
+      latitude: loc.lat, longitude: loc.lon, hourly: 'wind_speed_10m,wind_speed_80m', models: 'gfs_seamless',
+      forecast_days: FORECAST_DAYS, wind_speed_unit: 'kmh', timeformat: 'unixtime',
+    });
+    const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { cache: 'no-store' })).json();
+    const h = j.hourly, m = new Map();
+    h.time.forEach((t, i) => {
+      const a = h.wind_speed_10m[i], b = h.wind_speed_80m[i];
+      if (a != null && b != null) m.set(t * 1000, a >= 2 ? Math.min(Math.max(b / a, 1), 2.5) : 1);
+    });
+    memCache.set(key, { at: Date.now(), data: m });
+    return m;
+  }
+  function ratioAt(m, t) {
+    if (m.has(t)) return m.get(t);
+    let best = 1, bd = Infinity;               // 3 saatlik kaynaklar için en yakın saat
+    for (const [k, v] of m) { const d = Math.abs(k - t); if (d < bd) { bd = d; best = v; } }
+    return bd <= 3 * 3600e3 ? best : 1;
+  }
+  async function withBridgeHeight(loc, data, opts) {
+    if (!loc.bridge) return data;
+    try {
+      const m = await getHeightRatio(loc, opts);
+      return {
+        ...data, height: BRIDGE_H,
+        hours: data.hours.map(h => {
+          const k = ratioAt(m, h.t);
+          return { ...h, ws: h.ws != null ? h.ws * k : h.ws, wg: h.wg != null ? h.wg * k : h.wg, hk: k };
+        }),
+      };
+    } catch { return { ...data, heightErr: true }; }
+  }
+
+  async function fetchForecast(loc, modelId, opts = {}) {
+    const raw = await fetchForecastRaw(loc, modelId, opts);
+    return withBridgeHeight(loc, raw, opts);
+  }
+
+  async function fetchForecastRaw(loc, modelId, { force = false } = {}) {
     const model = MODELS.find(m => m.id === modelId);
     const src = state.source;
     const key = `${loc.lat},${loc.lon}|${src === 'infoplaza' ? 'ip' : modelId}`;
@@ -312,7 +366,7 @@
   // ---------- Motor modu: tüm kaynakların en yüksek hamlesi ----------
   // Open-Meteo'dan GFS + ICON + ECMWF tek istekte, varsa Infoplaza da; her saat için en yüksek hamle.
   async function getGustEnsemble(loc, { force = false } = {}) {
-    const key = `ens|${loc.lat},${loc.lon}`;
+    const key = `ens|${loc.lat},${loc.lon}|${loc.bridge ? 'b' : ''}`;
     const c = memCache.get(key);
     if (!force && c && Date.now() - c.at < CACHE_MS) return c.data;
     const byT = new Map();
@@ -333,6 +387,12 @@
       fetchInfoplazaFromSite(loc).then(d => d.hours.forEach(r => add(r.t, 'Infoplaza', r.wg))),
     ];
     await Promise.allSettled(jobs);
+    if (loc.bridge) {
+      try {
+        const m = await getHeightRatio(loc, { force });
+        for (const [t, e] of byT) { const k = ratioAt(m, t); for (const s of Object.keys(e)) e[s] *= k; }
+      } catch { /* oran alınamazsa 10 m değerleri kalır */ }
+    }
     memCache.set(key, { at: Date.now(), data: byT });
     return byT;
   }
@@ -593,7 +653,7 @@
       const t = data.dataAt || data.at;
       const tag = $('#sourceTag');
       tag.innerHTML = (data.fallback ? '<span class="warn">⚠ Infoplaza yok</span> · ' : '')
-        + `${label} · ${data.offline ? 'çevrimdışı ' : ''}${hhmm(t, loc.tz)}`;
+        + `${label}${data.height ? ` · <span class="h80" title="Köprü modu: ${BRIDGE_H} m yükseklik rüzgarı (GFS oranıyla)">🌉 ${BRIDGE_H} m</span>` : ''} · ${data.offline ? 'çevrimdışı ' : ''}${hhmm(t, loc.tz)}`;
       tag.title = data.fallback || '';
       tag.onclick = data.fallback ? () => alert(data.fallback) : null;
       renderDay(true);
@@ -687,8 +747,9 @@
 
     row(icoSun, (r, i) => `<td class="${cls(i, 'icon')}">${weatherIcon(r)}</td>`);
     row(icoDir, (r, i) => `<td class="${cls(i, 'dir')}" title="${Math.round(r.wd)}°">${arrow(r.wd)}</td>`);
-    row(`${unitLabel()}<br><small>rüzgar</small>`, (r, i) => `<td class="${cls(i, 'c')}" style="background:${windColor(r.ws)}">${windVal(r.ws)}</td>`);
-    row(`${unitLabel()}<br><small>${state.motor ? 'hamle▲' : 'hamle'}</small>`, (r, i) => {
+    const hTag = loc.bridge ? ` <span class="h80">${BRIDGE_H}m</span>` : '';
+    row(`${unitLabel()}<br><small>rüzgar${hTag}</small>`, (r, i) => `<td class="${cls(i, 'c')}" style="background:${windColor(r.ws)}">${windVal(r.ws)}</td>`);
+    row(`${unitLabel()}<br><small>${state.motor ? 'hamle▲' : 'hamle'}${hTag}</small>`, (r, i) => {
       const up = state.motor && r.wgBase != null && r.wg - r.wgBase >= 3;
       const tip = r.wgAll ? Object.entries(r.wgAll).map(([k, v]) => `${k} ${windVal(v)}`).join(' · ') : '';
       return `<td class="${cls(i, 'c' + (up ? ' up' : ''))}" style="background:${windColor(r.wg)}"${tip ? ` title="${tip}"` : ''}>${windVal(r.wg)}</td>`;
@@ -774,6 +835,9 @@
       const li = el('li', {}, `<span class="n">${esc(l.name)}<small>${l.lat.toFixed(3)}, ${l.lon.toFixed(3)}</small></span>`);
       const mk = (txt, c, fn, title) => { const b = el('button', { class: c, title, 'aria-label': title }, txt); b.addEventListener('click', fn); li.append(b); };
       const swap = j => { [state.locs[j], state.locs[i]] = [state.locs[i], state.locs[j]]; saveLocs(); renderLocBar(); renderEditList(); };
+      mk('🌉', l.bridge ? 'on' : '', () => {
+        l.bridge = !l.bridge; saveLocs(); renderEditList(); memCache.clear(); refresh();
+      }, l.bridge ? 'Köprü modu açık (80 m rüzgar) — kapat' : 'Köprü modu: 80 m rüzgarını göster');
       mk('✎', '', () => {
         const n = prompt('Yeni isim:', l.name);
         if (n) { l.name = n; saveLocs(); renderLocBar(); renderEditList(); renderMarkers(); $('#locTitle').textContent = curLoc()?.name ?? ''; }

@@ -30,6 +30,15 @@ Model satırındaki 🏍 düğmesiyle (veya Ayarlar → Motor modu) açılır:
   Hamle eşikleri Ayarlar'dan değiştirilebilir.
 - **Gün satırı**, gündüz saatlerindeki en uzun uygun aralığı gösterir (🏍 09–15). Uygun saat yoksa 🏍 ✗ yazar.
 
+## Köprü modu (🌉 80 m)
+
+Köprü tabliyesi denizden yaklaşık 65 m yüksekte ve orada rüzgar, standart 10 m rüzgarından belirgin şekilde kuvvetli.
+- 🌉 ile işaretli bölgelerde rüzgar ve hamle **80 m yüksekliğe** göre gösterilir. 1. ve 2. Köprü varsayılan olarak işaretlidir; Ayarlar → Bölgeler'deki 🌉 düğmesiyle istenen bölge açılıp kapatılabilir.
+- Yöntem: Her saat için GFS'nin 80 m / 10 m rüzgar oranı alınır ve seçili kaynağın (Open-Meteo modeli veya Infoplaza) rüzgarı ile hamlesi bu oranla çarpılır. Motor modundaki en yüksek hamleye de aynı oran uygulanır.
+- Oran 1 ile 2.5 arasında sınırlıdır. Rüzgar çok hafifken (<2 km/s) oran uygulanmaz.
+- Hamle için 80 m verisi olmadığından hamleye de rüzgarla aynı oran uygulanır; bu bir yaklaşımdır.
+- Modeller 7–25 km'lik kareler kullandığı için birbirine yakın iki köprü genelde aynı değeri alır.
+
 ## Harita
 
 Harita düğmesinden dört görünüm seçilebilir: Koyu (varsayılan), Açık, Uydu ve Sokak. Hepsi anahtarsızdır: Esri ve OpenStreetMap.
