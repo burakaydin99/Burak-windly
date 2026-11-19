@@ -850,6 +850,30 @@
       syncSrc(); $('#ipKey').value = state.ipKey; $('#ipProxy').value = state.ipProxy; $('#ipOut').hidden = true;
       if (state.source === 'infoplaza') showIpStatus();
     });
+    // Bölgeleri dışa / içe aktar (cihaz veya adres değiştirirken)
+    const locsJson = () => JSON.stringify(state.locs.map(l => ({ name: l.name, lat: l.lat, lon: l.lon })));
+    $('#locExport').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(locsJson()); $('#locIoHint').textContent = `${state.locs.length} bölge kopyalandı.`; }
+      catch { $('#locImportBox').hidden = false; $('#locImportTxt').value = locsJson(); $('#locImportTxt').select(); $('#locIoHint').textContent = 'Kopyalanamadı; metni seçip elle kopyala.'; }
+    });
+    $('#locImportBtn').addEventListener('click', () => { $('#locImportBox').hidden = !$('#locImportBox').hidden; $('#locImportTxt').focus(); });
+    $('#locImportDo').addEventListener('click', () => {
+      let list;
+      try { list = JSON.parse($('#locImportTxt').value.trim()); } catch { $('#locIoHint').textContent = 'Liste okunamadı: kopyaladığın metnin tamamını yapıştır.'; return; }
+      if (!Array.isArray(list)) list = [list];
+      let added = 0;
+      for (const x of list) {
+        const lat = +x.lat, lon = +x.lon;
+        if (!x.name || !isFinite(lat) || !isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+        if (state.locs.some(l => Math.abs(l.lat - lat) < 1e-3 && Math.abs(l.lon - lon) < 1e-3)) continue;
+        state.locs.push({ id: `loc-${Date.now().toString(36)}-${added}`, name: String(x.name).slice(0, 60), lat: +lat.toFixed(4), lon: +lon.toFixed(4), tz: null });
+        added++;
+      }
+      saveLocs(); renderLocBar(); renderEditList(); fitAll(); refresh();
+      $('#locImportTxt').value = ''; $('#locImportBox').hidden = true;
+      $('#locIoHint').textContent = added ? `${added} bölge eklendi.` : 'Yeni bölge yok (hepsi zaten kayıtlı).';
+    });
+
     $('#ipCopy').addEventListener('click', async () => {
       const txt = JSON.stringify(state.locs.map(l => ({ name: l.name, lat: l.lat, lon: l.lon })));
       try { await navigator.clipboard.writeText(txt); $('#ipCopyHint').textContent = 'Kopyalandı — Claude sohbetine yapıştır.'; }
