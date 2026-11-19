@@ -3,9 +3,9 @@
 Windy / Windguru tarzı, telefona uygun bir rüzgar tahmin uygulaması.
 
 - **Üstte kayıtlı bölgeler**: Bölgeler isimle aranarak, GPS konumundan, haritadan dokunarak ya da koordinat girilerek eklenir. Her bölgenin yanında şu anki rüzgar hızı renkli bir rozetle görünür.
-- **Harita ve pusula**: Seçili bölgedeki rüzgarın yönünü ve hızını gösterir. Tabloda bir sütuna dokununca pusula o saati gösterir.
+- **Harita**: Kayıtlı bölgeler haritada rüzgar yönü ve hızıyla işaretlidir. Bir işarete dokununca o bölge seçilir. Seçili bölge, rüzgar pusulasıyla gösterilir. Tabloda bir saate dokununca harita o saatin rüzgarını gösterir. ⤢ düğmesi tüm bölgeleri ekrana sığdırır.
 - **Model seçimi**: GFS, ECMWF ve ICON arasında geçiş yapılabilir.
-- **Gün şeridi**: Her günün rüzgar dağılımı renkli bir bar olarak görünür. Bir güne dokununca tablo o güne kayar.
+- **Gün seçimi**: Açılışta yalnızca bugün gösterilir. ◀ ▶ oklarıyla 7 gün içinde önceki ve sonraki güne geçilir. Gün başlığında o günün en yüksek rüzgar ve hamle değerleri, toplam yağış ve gün doğumu/batımı yazar.
 - **Saatlik tablo (yana kaydırmalı)**:
   - hava durumu ikonu
   - rüzgar yönü
@@ -17,13 +17,10 @@ Windy / Windguru tarzı, telefona uygun bir rüzgar tahmin uygulaması.
   - birim (km/s, knot, m/sn, Bft)
   - zaman adımı (1 veya 3 saat)
   - bölgeleri yeniden adlandırma, sıralama, silme
-  - Windy API anahtarı
 
 ## Veri kaynağı
 
-1. **Windy Point Forecast API**: Ayarlar'a bir anahtar girildiğinde veriler doğrudan Windy'den gelir. Anahtar https://api.windy.com/keys adresinden alınır (“Point Forecast API”). GFS bu yolla alınır. ICON için Windy'nin `iconEu` modeli kullanılır.
-   Not: Windy'nin ücretsiz *trial* anahtarı bilerek karıştırılmış (gerçek olmayan) veri döndürür. Gerçek veri için ücretli anahtar gerekir.
-2. **Open-Meteo**: Anahtar yoksa, Windy hata verirse veya model Windy API'de yoksa (ECMWF gibi) aynı modeller ücretsiz ve anahtarsız olarak Open-Meteo'dan çekilir.
+Veriler API anahtarı gerekmeden, canlı olarak [Open-Meteo](https://open-meteo.com)'dan çekilir. Open-Meteo, Windy'nin de kullandığı GFS, ECMWF ve ICON modellerini sunar. Yenile'ye basıldığında tüm kayıtlı bölgelerin 7 günlük tahmini yeniden alınır. İnternet yoksa en son çekilen veri “çevrimdışı” etiketiyle gösterilir.
 
 Kayıtlı bölgeler ve ayarlar tarayıcıda (localStorage) saklanır.
 

@@ -55,14 +55,33 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .chip.add { border-style: dashed; color: var(--muted); }
 
 /* Harita */
-.mapwrap { position: relative; height: 26vh; min-height: 150px; flex: none; transition: height .25s; }
+.mapwrap { position: relative; height: 34vh; min-height: 180px; flex: none; transition: height .25s; }
 .mapwrap.picking { height: 55vh; }
 #map { position: absolute; inset: 0; background: #e9e5dc; }
-.compass {
-  position: absolute; left: 50%; top: 50%; width: 140px; height: 140px; margin: -70px 0 0 -70px;
-  pointer-events: none; z-index: 500;
+.map-btn {
+  position: absolute; right: 10px; bottom: 22px; z-index: 600; width: 38px; height: 38px; border-radius: 10px;
+  border: 0; background: var(--bg); color: var(--text); display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0,0,0,.3);
 }
-.mapwrap.picking .compass { display: none; }
+.map-btn svg { width: 20px; height: 20px; }
+.mapwrap.picking .map-btn, .mapwrap.picking .leaflet-marker-pane { display: none; }
+/* Haritadaki bölge işaretleri */
+.pin-wrap { background: none; border: 0; }
+.pin { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; cursor: pointer; }
+.pin .pv {
+  display: flex; align-items: center; gap: 2px; padding: 2px 8px 2px 4px; border-radius: 12px;
+  font: 700 13px system-ui, sans-serif; color: #111; border: 1.5px solid rgba(0,0,0,.35); box-shadow: 0 1px 4px rgba(0,0,0,.3);
+  background: #ccc; white-space: nowrap;
+}
+.pin .pv svg { width: 16px; height: 16px; color: #111; }
+.pin .pn {
+  margin-top: 2px; font: 600 12px system-ui, sans-serif; color: #1b2733; white-space: nowrap;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+}
+.compass-mk { background: none; border: 0; pointer-events: none; }
+.compass-mk .pn {
+  position: absolute; left: 70px; top: 146px; transform: translateX(-50%); white-space: nowrap;
+  font: 700 13px system-ui, sans-serif; color: #1b2733; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+}
 .pick-banner {
   position: absolute; left: 12px; right: 12px; top: 10px; z-index: 600;
   background: var(--bg); padding: 10px 12px; border-radius: 10px;
@@ -81,25 +100,28 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .models button.active { background: var(--accent); color: var(--accent-ink); }
 .source { font-size: 11px; color: var(--muted); margin-left: auto; text-align: right; line-height: 1.2; }
 
-/* Gün şeridi */
-.daystrip { display: flex; overflow-x: auto; padding: 6px 8px 8px; gap: 2px; scrollbar-width: none; flex: none; }
-.daystrip::-webkit-scrollbar { display: none; }
-.day {
-  flex: 1 0 44px; border: 0; background: transparent; padding: 4px 2px 0; border-radius: 8px;
-  display: flex; flex-direction: column; align-items: center; gap: 1px;
+/* Gün seçimi */
+.daynav { display: flex; align-items: center; gap: 6px; padding: 8px 8px; flex: none; }
+.nav-btn {
+  width: 46px; height: 46px; flex: none; border: 1px solid var(--line); background: var(--bg3); border-radius: 12px;
+  display: grid; place-items: center;
 }
-.day .dn { font-size: 15px; }
-.day .dd { font-size: 17px; font-weight: 500; }
-.day.we .dn, .day.we .dd { color: var(--accent); }
-.day .bar { width: 100%; height: 8px; border-radius: 4px; margin-top: 4px; }
-.day.active { background: rgba(255,255,255,.08); }
+.nav-btn svg { width: 24px; height: 24px; }
+.nav-btn:disabled { opacity: .3; cursor: default; }
+.nav-btn:not(:disabled):active { background: var(--accent); color: var(--accent-ink); }
+.dayinfo { flex: 1; text-align: center; min-width: 0; }
+.dayinfo .t { font-size: 19px; font-weight: 600; }
+.dayinfo .t .we { color: var(--accent); }
+.dayinfo .s { font-size: 13px; color: var(--muted); margin-top: 2px; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.dayinfo .s b { color: #111; padding: 0 6px; border-radius: 6px; font-weight: 700; }
+.dayinfo .today { font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 6px; padding: 1px 6px; vertical-align: 3px; margin-left: 6px; }
 
 /* Tablo */
 .forecast { flex: 1; overflow: auto; position: relative; overscroll-behavior: contain; border-top: 1px solid var(--line); }
 .status { padding: 24px 16px; color: var(--muted); text-align: center; }
 .status.err { color: #ff8f80; }
-table.fc { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
-.fc th, .fc td { padding: 0; text-align: center; height: var(--row-h); min-width: var(--col-w); width: var(--col-w); white-space: nowrap; }
+table.fc { min-width: 100%; border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+.fc th, .fc td { padding: 0; text-align: center; height: var(--row-h); min-width: 44px; white-space: nowrap; }
 .fc .lbl {
   position: sticky; left: 0; z-index: 3; background: var(--bg2);
   min-width: var(--label-w); width: var(--label-w); color: var(--muted); font-size: 14px; font-weight: 500;
@@ -107,16 +129,13 @@ table.fc { border-collapse: separate; border-spacing: 0; font-variant-numeric: t
 }
 .fc .lbl svg { width: 22px; height: 22px; vertical-align: middle; }
 .fc thead th { position: sticky; z-index: 2; background: var(--bg); }
-.fc thead tr.days th { top: 0; height: 40px; text-align: left; padding-left: 8px; font-size: 15px; font-weight: 600; border-left: 2px solid var(--line); }
-.fc thead tr.days th span.sun { color: var(--muted); font-weight: 400; font-size: 13px; margin-left: 8px; }
-.fc thead tr.hours th { top: 40px; font-size: 18px; font-weight: 500; border-bottom: 1px solid var(--line); }
-.fc thead tr.days th.lbl { z-index: 4; border-left: 0; }
+.fc thead tr.hours th { top: 0; font-size: 18px; font-weight: 500; border-bottom: 1px solid var(--line); height: 40px; }
 .fc thead tr.hours th.lbl { z-index: 4; font-size: 13px; color: var(--accent); }
 .fc thead th.night { background: var(--bg2); }
-.fc td.dstart, .fc th.dstart { border-left: 2px solid var(--line); }
+.fc thead th.focus { box-shadow: inset 0 -4px 0 var(--accent); }
 .fc td.now, .fc th.now { box-shadow: inset 0 0 0 999px rgba(255,255,255,.06); }
 .fc thead th.now { color: var(--accent); }
-.fc td.c { font-size: 19px; color: #111; font-weight: 500; }
+.fc td.c { font-size: 18px; color: #111; font-weight: 500; }
 .fc td.icon svg { width: 34px; height: 34px; }
 .fc td.dir svg { width: 22px; height: 22px; color: var(--text); }
 .fc td.rain { font-size: 16px; }

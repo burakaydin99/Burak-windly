@@ -1,6 +1,5 @@
-/* Rüzgar Takip — kayıtlı bölgeler için saatlik rüzgar / hamle / yağış / sıcaklık tablosu.
- * Veri kaynağı: Windy Point Forecast API (anahtar girilmişse), aksi halde Open-Meteo
- * (Windy'nin de kullandığı GFS / ECMWF / ICON modelleri).
+/* Rüzgar Takip — kayıtlı bölgeler için saatlik rüzgar / hamle / yağış / sıcaklık.
+ * Veri: Open-Meteo (anahtarsız, canlı) — Windy'nin de kullandığı GFS / ECMWF / ICON modelleri.
  */
 (() => {
   'use strict';
@@ -16,10 +15,11 @@
   ];
 
   const MODELS = [
-    { id: 'gfs',   label: 'GFS',   windy: 'gfs',    om: 'gfs_seamless' },
-    { id: 'ecmwf', label: 'ECMWF', windy: null,     om: 'ecmwf_ifs025' },
-    { id: 'icon',  label: 'ICON',  windy: 'iconEu', om: 'icon_seamless' },
+    { id: 'gfs',   label: 'GFS',   om: 'gfs_seamless' },
+    { id: 'ecmwf', label: 'ECMWF', om: 'ecmwf_ifs025' },
+    { id: 'icon',  label: 'ICON',  om: 'icon_seamless' },
   ];
+  const FORECAST_DAYS = 7;
 
   const state = {
     locs: store.get('locs', DEFAULT_LOCS),
@@ -27,9 +27,10 @@
     model: store.get('model', 'gfs'),
     unit: store.get('unit', 'kmh'),
     step: store.get('step', 3),
-    windyKey: store.get('windyKey', ''),
-    rows: [],
-    focus: null,       // compass'ta gösterilen satır
+    rows: [],          // seçili bölgenin tüm satırları (7 gün)
+    days: [],          // [{key, rows}]
+    dayKey: null,      // gösterilen gün (null = bugün)
+    focusT: null,      // pusula / işaretlerde gösterilen zaman (null = şimdi)
     picking: false,
   };
   if (!state.locs.find(l => l.id === state.sel)) state.sel = state.locs[0]?.id ?? null;
@@ -59,7 +60,7 @@
     for (const x of f.formatToParts(new Date(ms))) p[x.type] = x.value;
     return { y: +p.year, mo: +p.month, d: +p.day, h: +p.hour, mi: +p.minute, wd: p.weekday, key: `${p.year}-${p.month}-${p.day}` };
   }
-  const TR_DAY = { Mon: 'Pzt', Tue: 'Sal', Wed: 'Çar', Thu: 'Per', Fri: 'Cum', Sat: 'Cmt', Sun: 'Paz' };
+  const TR_DAY = { Mon: 'Pazartesi', Tue: 'Salı', Wed: 'Çarşamba', Thu: 'Perşembe', Fri: 'Cuma', Sat: 'Cumartesi', Sun: 'Pazar' };
   const TR_MON = ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
   const hhmm = (ms, tz) => { const p = tparts(ms, tz); return `${String(p.h).padStart(2, '0')}:${String(p.mi).padStart(2, '0')}`; };
 
@@ -75,7 +76,7 @@
     const Jt = Js + 0.0053 * Math.sin(M * rad) - 0.0069 * Math.sin(2 * L * rad);
     const dec = Math.asin(Math.sin(L * rad) * Math.sin(23.4397 * rad));
     const cosw = (Math.sin(-0.833 * rad) - Math.sin(lat * rad) * Math.sin(dec)) / (Math.cos(lat * rad) * Math.cos(dec));
-    if (cosw > 1 || cosw < -1) return null; // kutup gecesi / gündüzü
+    if (cosw > 1 || cosw < -1) return null;
     const w = Math.acos(cosw) / rad;
     const toMs = j => (j - 2440587.5) * 864e5;
     return { rise: toMs(Jt - w / 360), set: toMs(Jt + w / 360) };
@@ -89,13 +90,14 @@
     switch (state.unit) {
       case 'kt': v = kmh / 1.852; break;
       case 'ms': v = kmh / 3.6; break;
-      case 'bft': return String(BFT.findIndex(t => kmh < t) === -1 ? 12 : BFT.findIndex(t => kmh < t));
+      case 'bft': { const i = BFT.findIndex(t => kmh < t); return String(i === -1 ? 12 : i); }
       default: v = kmh;
     }
     return v < 10 ? v.toFixed(1) : Math.round(v).toString();
   }
   const unitLabel = () => ({ kmh: 'km/s', kt: 'knot', ms: 'm/sn', bft: 'Bft' })[state.unit];
 
+  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   function lerpColor(stops, v) {
     if (v == null || isNaN(v)) return 'transparent';
     if (v <= stops[0][0]) return stops[0][1];
@@ -110,7 +112,6 @@
     }
     return stops[stops.length - 1][1];
   }
-  const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
   // km/s cinsinden, Windy/Windguru benzeri skala
   const WIND_STOPS = [
     [0, '#5b7fb8'], [6, '#5a8fc4'], [11, '#4f9fc0'], [16, '#39b0a0'], [21, '#4cc46c'],
@@ -136,7 +137,7 @@
   function weatherIcon(r) {
     const night = !r.day;
     const cl = r.cloud ?? 0;
-    const p = r.precipH ?? 0; // mm/saat
+    const p = r.precipH ?? 0;
     let s;
     if (p >= 0.1) {
       const n = p >= 2 ? 3 : p >= 0.6 ? 2 : 1;
@@ -148,9 +149,9 @@
   }
   // Rüzgarın ESTİĞİ yönü gösteren ok (meteorolojik yön + 180°)
   const arrow = (deg, size = 22) => deg == null ? '' :
-    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="transform:rotate(${deg + 180}deg)"><path d="M12 3v18M12 3l-5 6M12 3l5 6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="transform:rotate(${deg + 180}deg)"><path d="M12 3v18M12 3l-5 6M12 3l5 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-  // ---------- Veri çekme ----------
+  // ---------- Veri çekme (canlı, anahtarsız) ----------
   const memCache = new Map();
   const CACHE_MS = 30 * 60e3;
 
@@ -158,10 +159,14 @@
     const q = new URLSearchParams({
       latitude: loc.lat, longitude: loc.lon,
       hourly: 'temperature_2m,relative_humidity_2m,precipitation,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
-      models: model.om, forecast_days: 10, wind_speed_unit: 'kmh', timeformat: 'unixtime', timezone: 'auto',
+      models: model.om, forecast_days: FORECAST_DAYS, wind_speed_unit: 'kmh', timeformat: 'unixtime', timezone: 'auto',
     });
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`);
-    if (!res.ok) throw new Error(`Open-Meteo ${res.status}`);
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { cache: 'no-store' });
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`;
+      try { const e = await res.json(); if (e.reason) msg += `: ${e.reason}`; } catch { /* yoksay */ }
+      throw new Error(msg);
+    }
     const j = await res.json();
     const h = j.hourly;
     const hours = h.time.map((t, i) => ({
@@ -169,120 +174,155 @@
       ws: h.wind_speed_10m[i], wg: h.wind_gusts_10m?.[i], wd: h.wind_direction_10m[i],
       temp: h.temperature_2m[i], precip: h.precipitation?.[i], cloud: h.cloud_cover?.[i], rh: h.relative_humidity_2m?.[i],
     })).filter(r => r.ws != null && r.temp != null);
-    return { hours, precipWin: 1, tz: j.timezone, source: 'Open-Meteo' };
+    return { hours, tz: j.timezone };
   }
 
-  async function fetchWindy(loc, model) {
-    const res = await fetch('https://api.windy.com/api/point-forecast/v2', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        lat: +loc.lat.toFixed(3), lon: +loc.lon.toFixed(3), model: model.windy,
-        parameters: ['wind', 'windGust', 'temp', 'precip', 'lclouds', 'mclouds', 'hclouds', 'rh'],
-        levels: ['surface'], key: state.windyKey,
-      }),
-    });
-    if (!res.ok) {
-      let msg = `Windy ${res.status}`;
-      try { const e = await res.json(); if (e.message) msg += `: ${e.message}`; } catch { /* yoksay */ }
-      throw new Error(msg);
-    }
-    const j = await res.json();
-    const g = k => j[`${k}-surface`] || [];
-    const u = g('wind_u'), v = g('wind_v'), gust = g('gust'), temp = g('temp'), pr = g('past3hprecip');
-    const lc = g('lclouds'), mc = g('mclouds'), hc = g('hclouds'), rh = g('rh');
-    const hours = j.ts.map((t, i) => {
-      const uu = u[i], vv = v[i];
-      const ok = uu != null && vv != null;
-      return {
-        t,
-        ws: ok ? Math.hypot(uu, vv) * 3.6 : null,
-        wd: ok ? (Math.atan2(-uu, -vv) * 180 / Math.PI + 360) % 360 : null,
-        wg: gust[i] != null ? gust[i] * 3.6 : null,
-        temp: temp[i] != null ? temp[i] - 273.15 : null,
-        precip: pr[i] != null ? Math.max(0, pr[i] * 1000) : null,
-        cloud: Math.max(lc[i] ?? 0, mc[i] ?? 0, hc[i] ?? 0),
-        rh: rh[i],
-      };
-    }).filter(r => r.ws != null);
-    return { hours, precipWin: 3, tz: null, source: 'Windy API' };
+  // Aynı bölge için eşzamanlı istekleri tek istekte birleştir
+  const inflight = new Map();
+  function getForecast(loc, modelId, opts = {}) {
+    const key = `${loc.lat},${loc.lon}|${modelId}|${opts.force ? 1 : 0}`;
+    if (!inflight.has(key)) inflight.set(key, fetchForecast(loc, modelId, opts).finally(() => inflight.delete(key)));
+    return inflight.get(key);
   }
 
-  async function getForecast(loc, modelId, { force = false } = {}) {
+  async function fetchForecast(loc, modelId, { force = false } = {}) {
     const model = MODELS.find(m => m.id === modelId);
-    const useWindy = !!(state.windyKey && model.windy);
-    const key = `${loc.id}|${loc.lat}|${loc.lon}|${modelId}|${useWindy ? 'w' : 'o'}`;
+    const key = `${loc.lat},${loc.lon}|${modelId}`;
     const c = memCache.get(key);
     if (!force && c && Date.now() - c.at < CACHE_MS) return c.data;
-    let data, note = '';
+    let data;
     try {
-      data = useWindy ? await fetchWindy(loc, model) : await fetchOpenMeteo(loc, model);
+      data = await fetchOpenMeteo(loc, model);
+      data.at = Date.now();
+      data.offline = false;
+      store.set(`fc:${key}`, data);
     } catch (err) {
-      if (useWindy) {
-        note = `${err.message} → Open-Meteo`;
-        data = await fetchOpenMeteo(loc, model);
-      } else {
-        const off = store.get(`fc:${key}`, null);
-        if (off) { data = off.data; note = `çevrimdışı · ${hhmm(off.at, loc.tz)}`; } else throw err;
-      }
+      const off = store.get(`fc:${key}`, null);
+      if (!off) throw err;
+      data = { ...off, offline: true, err: err.message };
     }
-    data.note = note;
-    data.at = Date.now();
     if (!loc.tz && data.tz) { loc.tz = data.tz; saveLocs(); }
     memCache.set(key, { at: Date.now(), data });
-    if (!note) store.set(`fc:${key}`, { at: Date.now(), data });
     return data;
   }
 
   // Saatlik veriyi seçilen adıma (1s / 3s) indir; hamle = pencere içindeki maks., yağış = toplam
   function buildRows(data, loc) {
-    const tz = loc.tz;
     const hrs = data.hours;
-    const native = hrs.length > 1 ? Math.round((hrs[1].t - hrs[0].t) / 3600e3) : 1;
     const step = Math.max(state.step, 1);
-    const now = Date.now();
     const out = [];
     for (let i = 0; i < hrs.length; i++) {
       const r = hrs[i];
-      const p = tparts(r.t, tz);
-      if (step > native && p.h % step !== 0) continue;
-      if (r.t < now - step * 3600e3) continue;
-      const win = hrs.filter(x => x.t > r.t - step * 3600e3 && x.t <= r.t);
+      const p = tparts(r.t, loc.tz);
+      if (step > 1 && p.h % step !== 0) continue;
       let wg = r.wg, precip = r.precip;
-      if (step > native) {
+      if (step > 1) {
+        const win = hrs.slice(Math.max(0, i - step + 1), i + 1).filter(x => x.t > r.t - step * 3600e3);
         const gs = win.map(x => x.wg).filter(x => x != null);
         if (gs.length) wg = Math.max(...gs);
-        if (data.precipWin === 1) precip = win.reduce((s, x) => s + (x.precip || 0), 0);
+        precip = win.reduce((s, x) => s + (x.precip || 0), 0);
       }
-      const precipWin = data.precipWin === 1 ? Math.max(step, native) : data.precipWin;
       const sun = sunTimes(r.t, loc.lat, loc.lon);
       const day = sun ? (r.t > sun.rise && r.t < sun.set) : true;
-      out.push({ ...r, wg, precip, precipH: precip != null ? precip / precipWin : null, p, day });
+      out.push({ ...r, wg, precip, precipH: precip != null ? precip / step : null, p, day });
     }
-    return { rows: out, precipWin: data.precipWin === 1 ? Math.max(step, native) : data.precipWin, native };
+    return out;
   }
 
+  const nearest = (hours, t) => hours.reduce((a, b) => Math.abs(b.t - t) < Math.abs(a.t - t) ? b : a, hours[0]);
+
   // ---------- Harita ----------
-  let map;
+  let map, compassMk;
+  const pins = new Map();
+
   function initMap() {
-    if (!window.L) { $('#map').textContent = ''; return; }
-    map = L.map('map', { zoomControl: false, attributionControl: true, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false, tap: false });
+    if (!window.L) return;
+    map = L.map('map', { zoomControl: false, attributionControl: true, tap: false });
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, subdomains: 'abcd',
-      attribution: '© OpenStreetMap © CARTO',
+      maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap © CARTO',
     }).addTo(map);
     map.on('click', onMapPick);
-    const l = curLoc();
-    map.setView(l ? [l.lat, l.lon] : [41.0, 29.0], 13);
+    fitAll(false);
   }
+
+  function fitAll(animate = true) {
+    if (!map) return;
+    const ls = state.locs;
+    if (ls.length > 1) map.fitBounds(L.latLngBounds(ls.map(l => [l.lat, l.lon])), { padding: [60, 60], maxZoom: 12, animate });
+    else if (ls.length) map.setView([ls[0].lat, ls[0].lon], 12, { animate });
+    else map.setView([39.0, 35.0], 5);
+  }
+
+  function focusSelected() {
+    const l = curLoc();
+    if (!map || !l) return;
+    const ll = L.latLng(l.lat, l.lon);
+    if (!map.getBounds().pad(-0.15).contains(ll) || map.getZoom() < 8) map.setView(ll, Math.max(map.getZoom(), 10));
+  }
+
+  function compassSvg(r) {
+    const cx = 70, cy = 70;
+    const rad = (r.wd - 90) * Math.PI / 180;
+    const px = cx + Math.cos(rad) * 38, py = cy + Math.sin(rad) * 38;
+    const txt = `${windVal(r.ws)} ${unitLabel()}`;
+    const w = txt.length * 7.4 + 14;
+    return `<svg viewBox="0 0 140 140" width="140" height="140">
+      <circle cx="${cx}" cy="${cy}" r="62" fill="rgba(255,255,255,.35)" stroke="#555" stroke-width="2"/>
+      <g font-size="12" text-anchor="middle" fill="#555" font-family="system-ui">
+        <text x="70" y="22" fill="#d33">K</text><text x="70" y="128">G</text><text x="16" y="74">B</text><text x="124" y="74">D</text>
+      </g>
+      <g transform="rotate(${r.wd + 180} 70 70)">
+        <line x1="70" y1="104" x2="70" y2="40" stroke="#333" stroke-width="3" stroke-linecap="round"/>
+        <path d="M70 32l-8 12h16z" fill="#333"/>
+      </g>
+      <circle cx="70" cy="70" r="7" fill="#fff" stroke="#555" stroke-width="2"/>
+      <g transform="translate(${px} ${py})">
+        <rect x="${-w / 2}" y="-11" width="${w}" height="22" rx="11" fill="${windColor(r.ws)}" stroke="rgba(0,0,0,.35)"/>
+        <text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#111" font-family="system-ui">${txt}</text>
+      </g>
+    </svg>`;
+  }
+
+  // Her kayıtlı bölge için harita işareti; seçili bölge pusula olarak gösterilir.
+  function renderMarkers() {
+    if (!map) return;
+    const live = new Set(state.locs.map(l => l.id));
+    for (const [id, m] of pins) if (!live.has(id)) { map.removeLayer(m); pins.delete(id); }
+    for (const l of state.locs) {
+      if (l.id === state.sel) { if (pins.has(l.id)) { map.removeLayer(pins.get(l.id)); pins.delete(l.id); } continue; }
+      let m = pins.get(l.id);
+      if (!m) {
+        m = L.marker([l.lat, l.lon], { icon: pinIcon(l, null), riseOnHover: true });
+        m.on('click', () => selectLoc(l.id, { fromMap: true }));
+        m.addTo(map);
+        pins.set(l.id, m);
+      } else m.setLatLng([l.lat, l.lon]);
+      m.setIcon(pinIcon(l, l._r));
+    }
+    renderCompass();
+  }
+  function pinIcon(l, r) {
+    const val = r ? `${arrow(r.wd, 16)}${windVal(r.ws)}` : '…';
+    return L.divIcon({
+      className: 'pin-wrap', iconSize: null,
+      html: `<div class="pin"><span class="pv" style="background:${r ? windColor(r.ws) : '#ddd'}">${val}</span><span class="pn">${esc(l.name)}</span></div>`,
+    });
+  }
+  function renderCompass() {
+    if (!map) return;
+    const l = curLoc();
+    const r = l?._r;
+    if (!l || !r) { if (compassMk) { map.removeLayer(compassMk); compassMk = null; } return; }
+    const icon = L.divIcon({ className: 'compass-mk', iconSize: [140, 140], iconAnchor: [70, 70], html: compassSvg(r) + `<span class="pn">${esc(l.name)}</span>` });
+    if (!compassMk) compassMk = L.marker([l.lat, l.lon], { icon, interactive: false, zIndexOffset: -100 }).addTo(map);
+    else { compassMk.setLatLng([l.lat, l.lon]); compassMk.setIcon(icon); }
+  }
+
   function setPicking(on) {
     state.picking = on;
     $('#mapWrap').classList.toggle('picking', on);
     $('#pickBanner').hidden = !on;
-    if (!map) return;
-    const h = on ? 'enable' : 'disable';
-    map.dragging[h](); map.touchZoom[h](); map.scrollWheelZoom[h](); map.doubleClickZoom[h]();
-    setTimeout(() => { map.invalidateSize(); if (!on) centerMap(); }, 280);
+    setTimeout(() => map && map.invalidateSize(), 280);
   }
   function onMapPick(e) {
     if (!state.picking) return;
@@ -290,34 +330,6 @@
     if (!name) return;
     setPicking(false);
     addLoc({ name, lat: e.latlng.lat, lon: e.latlng.lng });
-  }
-  const centerMap = () => { const l = curLoc(); if (map && l) map.setView([l.lat, l.lon], map.getZoom() || 13, { animate: false }); };
-
-  function renderCompass(r) {
-    const c = $('#compass');
-    if (!r) { c.innerHTML = ''; return; }
-    const R = 62, cx = 70, cy = 70;
-    const from = r.wd;
-    const rad = (from - 90) * Math.PI / 180;           // rüzgarın geldiği taraf
-    const px = cx + Math.cos(rad) * 38, py = cy + Math.sin(rad) * 38;
-    const col = windColor(r.ws);
-    const txt = `${windVal(r.ws)} ${unitLabel()}`;
-    const w = txt.length * 7.4 + 14;
-    c.innerHTML = `<svg viewBox="0 0 140 140" width="140" height="140">
-      <circle cx="${cx}" cy="${cy}" r="${R}" fill="rgba(255,255,255,.12)" stroke="#555" stroke-width="2"/>
-      <g font-size="12" text-anchor="middle" fill="#666" font-family="system-ui">
-        <text x="70" y="22" fill="#d33">K</text><text x="70" y="128">G</text><text x="16" y="74">B</text><text x="124" y="74">D</text>
-      </g>
-      <g transform="rotate(${from + 180} 70 70)">
-        <line x1="70" y1="104" x2="70" y2="40" stroke="#333" stroke-width="3" stroke-linecap="round"/>
-        <path d="M70 32l-8 12h16z" fill="#333"/>
-      </g>
-      <circle cx="70" cy="70" r="7" fill="#fff" stroke="#555" stroke-width="2"/>
-      <g transform="translate(${px} ${py})">
-        <rect x="${-w / 2}" y="-11" width="${w}" height="22" rx="11" fill="${col}" stroke="#2a6" stroke-width="1"/>
-        <text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#111" font-family="system-ui">${txt}</text>
-      </g>
-    </svg>`;
   }
 
   // ---------- Arayüz ----------
@@ -332,19 +344,23 @@
     }
     bar.append(el('button', { class: 'chip add', onclick: openAdd }, '＋ Ekle'));
     bar.querySelector('.active')?.scrollIntoView({ inline: 'center', block: 'nearest' });
-    updateBadges();
+    paintBadges();
   }
 
-  // Her kayıtlı bölgenin chip'inde şu anki rüzgarı göster (karşılaştırma için)
-  async function updateBadges() {
+  // Tüm bölgelerin verisini çek (işaret ve rozetler için)
+  async function loadAll({ force = false } = {}) {
+    await Promise.all(state.locs.map(l => getForecast(l, state.model, { force }).then(d => { l._data = d; }).catch(() => { l._data = null; })));
+    paintBadges();
+  }
+  // Rozet ve işaretlerde odak zamanındaki (varsayılan: şimdi) rüzgarı göster
+  function paintBadges() {
+    const t = state.focusT ?? Date.now();
     for (const l of state.locs) {
-      getForecast(l, state.model).then(d => {
-        const now = Date.now();
-        const r = d.hours.reduce((a, b) => Math.abs(b.t - now) < Math.abs(a.t - now) ? b : a, d.hours[0]);
-        const s = document.querySelector(`.chip[data-id="${CSS.escape(l.id)}"] .w`);
-        if (s && r) { s.hidden = false; s.textContent = windVal(r.ws); s.style.background = windColor(r.ws); }
-      }).catch(() => { /* chip'te rozet olmadan kalır */ });
+      l._r = l._data?.hours?.length ? nearest(l._data.hours, t) : null;
+      const s = document.querySelector(`.chip[data-id="${CSS.escape(l.id)}"] .w`);
+      if (s && l._r) { s.hidden = false; s.textContent = windVal(l._r.ws); s.style.background = windColor(l._r.ws); }
     }
+    renderMarkers();
   }
 
   function renderModels() {
@@ -353,21 +369,32 @@
     for (const m of MODELS) {
       t.append(el('button', {
         class: m.id === state.model ? 'active' : '',
-        onclick: () => { state.model = m.id; store.set('model', m.id); renderModels(); load(); updateBadges(); },
+        onclick: () => { state.model = m.id; store.set('model', m.id); renderModels(); refresh(); },
       }, m.label));
     }
   }
 
-  function selectLoc(id) {
+  function selectLoc(id, { fromMap = false } = {}) {
     state.sel = id; saveLocs();
-    renderLocBar(); centerMap(); load();
+    renderLocBar();
+    if (!fromMap) focusSelected();
+    load();
+  }
+
+  // Seçili bölgeyi yükle + diğer bölgeleri arka planda güncelle
+  async function refresh({ force = false } = {}) {
+    load({ force });
+    loadAll({ force });
   }
 
   async function load({ force = false } = {}) {
     const loc = curLoc();
     $('#locTitle').textContent = loc ? loc.name : 'Rüzgar Takip';
     const fc = $('#forecast');
-    if (!loc) { fc.innerHTML = '<div class="status">Yukarıdan “＋ Ekle” ile bir bölge kaydet.</div>'; $('#dayStrip').innerHTML = ''; renderCompass(null); return; }
+    if (!loc) {
+      fc.innerHTML = '<div class="status">Yukarıdan “＋ Ekle” ile bir bölge kaydet.</div>';
+      $('#dayInfo').innerHTML = ''; renderCompass(); return;
+    }
     const btn = $('#refreshBtn');
     btn.classList.add('spin');
     if (!fc.querySelector('table')) fc.innerHTML = '<div class="status">Yükleniyor…</div>';
@@ -375,48 +402,83 @@
     try {
       const data = await getForecast(loc, state.model, { force });
       if (reqId !== load.req) return;
+      loc._data = data;
       const model = MODELS.find(m => m.id === state.model);
-      const built = buildRows(data, loc);
-      state.rows = built.rows;
-      $('#sourceTag').innerHTML = `${esc(data.source)} · ${model.label}<br>${data.note ? esc(data.note) : 'güncellendi ' + hhmm(data.at, loc.tz)}`;
-      renderTable(built, loc);
-      renderDays(loc);
+      state.rows = buildRows(data, loc);
+      state.days = [];
+      for (const r of state.rows) {
+        const d = state.days[state.days.length - 1];
+        if (!d || d.key !== r.p.key) state.days.push({ key: r.p.key, rows: [r] }); else d.rows.push(r);
+      }
+      const todayKey = tparts(Date.now(), loc.tz).key;
+      if (!state.days.find(d => d.key === state.dayKey)) state.dayKey = null;
+      if (!state.dayKey) state.dayKey = (state.days.find(d => d.key === todayKey) || state.days[0])?.key;
+      $('#sourceTag').innerHTML = data.offline
+        ? `${model.label} · çevrimdışı<br>son veri ${hhmm(data.at, loc.tz)}`
+        : `${model.label} · canlı<br>güncellendi ${hhmm(data.at, loc.tz)}`;
+      renderDay(true);
+      paintBadges();
     } catch (err) {
       if (reqId !== load.req) return;
-      fc.innerHTML = `<div class="status err">Veri alınamadı: ${esc(err.message)}</div>`;
+      fc.innerHTML = `<div class="status err">Veri alınamadı: ${esc(err.message)}<br><small>İnternet bağlantını kontrol edip yenile'ye bas.</small></div>`;
     } finally {
       btn.classList.remove('spin');
     }
   }
 
-  function renderTable({ rows, precipWin }, loc) {
+  // ---------- Gün gezinme ----------
+  function changeDay(delta) {
+    const i = state.days.findIndex(d => d.key === state.dayKey);
+    const n = state.days[i + delta];
+    if (!n) return;
+    state.dayKey = n.key;
+    renderDay(true);
+    paintBadges();
+  }
+
+  function renderDay(resetFocus) {
+    const loc = curLoc();
+    const i = state.days.findIndex(d => d.key === state.dayKey);
+    const day = state.days[i];
+    $('#prevDay').disabled = i <= 0;
+    $('#nextDay').disabled = i < 0 || i >= state.days.length - 1;
+    if (!day) { $('#dayInfo').innerHTML = ''; return; }
+
+    const p = day.rows[0].p;
+    const now = Date.now();
+    const isToday = p.key === tparts(now, loc.tz).key;
+    const we = p.wd === 'Sat' || p.wd === 'Sun';
+    const sun = sunTimes(Date.UTC(p.y, p.mo - 1, p.d, 12), loc.lat, loc.lon);
+    const maxWs = Math.max(...day.rows.map(r => r.ws ?? 0));
+    const maxWg = Math.max(...day.rows.map(r => r.wg ?? 0));
+    const rain = day.rows.reduce((s, r) => s + (r.precip || 0), 0);
+    $('#dayInfo').innerHTML = `
+      <div class="t"><span class="${we ? 'we' : ''}">${TR_DAY[p.wd] || p.wd}, ${p.d} ${TR_MON[p.mo - 1]}</span>${isToday ? '<span class="today">BUGÜN</span>' : ''}</div>
+      <div class="s">
+        <span>maks <b style="background:${windColor(maxWs)}">${windVal(maxWs)}</b> / <b style="background:${windColor(maxWg)}">${windVal(maxWg)}</b></span>
+        ${rain >= 0.1 ? `<span>💧 ${rain.toFixed(1)} mm</span>` : ''}
+        ${sun ? `<span>☀ ${hhmm(sun.rise, loc.tz)} – ${hhmm(sun.set, loc.tz)}</span>` : ''}
+      </div>`;
+
+    if (resetFocus) {
+      // Bugünse şimdiki saat, değilse öğlen
+      state.focusT = isToday ? null : day.rows.reduce((a, b) => Math.abs(b.p.h - 12) < Math.abs(a.p.h - 12) ? b : a).t;
+    }
+    renderTable(day.rows, loc);
+  }
+
+  function renderTable(rows, loc) {
     const fc = $('#forecast');
     if (!rows.length) { fc.innerHTML = '<div class="status">Veri yok.</div>'; return; }
-    const tz = loc.tz;
     const now = Date.now();
-    const stepMs = (rows.length > 1 ? rows[1].t - rows[0].t : 3600e3);
-    const nowIdx = rows.findIndex(r => now < r.t + stepMs / 2 && now >= r.t - stepMs / 2);
+    const stepMs = state.step * 3600e3;
+    const nowIdx = rows.findIndex(r => now >= r.t - stepMs / 2 && now < r.t + stepMs / 2);
+    const focusT = state.focusT ?? now;
+    const focusIdx = rows.indexOf(nearest(rows, focusT));
+    const cls = (i, extra = '') => `${extra}${i === nowIdx ? ' now' : ''}`;
 
-    // Gün grupları
-    const groups = [];
-    rows.forEach((r, i) => {
-      const g = groups[groups.length - 1];
-      if (!g || g.key !== r.p.key) groups.push({ key: r.p.key, start: i, n: 1, r });
-      else g.n++;
-    });
-    const isStart = new Set(groups.map(g => g.start));
-
-    const cellCls = (i, extra = '') => `${extra}${isStart.has(i) ? ' dstart' : ''}${i === nowIdx ? ' now' : ''}`;
-
-    let h = '<table class="fc"><thead><tr class="days"><th class="lbl"></th>';
-    for (const g of groups) {
-      const sun = sunTimes(Date.UTC(g.r.p.y, g.r.p.mo - 1, g.r.p.d, 12), loc.lat, loc.lon);
-      const name = `${TR_DAY[g.r.p.wd] || g.r.p.wd} ${g.r.p.d} ${TR_MON[g.r.p.mo - 1]}`;
-      const sunTxt = sun && g.n >= 3 ? `<span class="sun">☀ ${hhmm(sun.rise, tz)} ☾ ${hhmm(sun.set, tz)}</span>` : '';
-      h += `<th colspan="${g.n}" data-day="${g.key}"><div style="position:sticky;left:calc(var(--label-w) + 8px);display:inline-block">${name.toUpperCase()}${sunTxt}</div></th>`;
-    }
-    h += `</tr><tr class="hours"><th class="lbl">${state.step}s</th>`;
-    rows.forEach((r, i) => { h += `<th class="${cellCls(i, r.day ? '' : 'night')}" data-i="${i}">${String(r.p.h).padStart(2, '0')}</th>`; });
+    let h = `<table class="fc"><thead><tr class="hours"><th class="lbl">${state.step}s</th>`;
+    rows.forEach((r, i) => { h += `<th class="${cls(i, r.day ? '' : 'night')}${i === focusIdx ? ' focus' : ''}" data-i="${i}">${String(r.p.h).padStart(2, '0')}</th>`; });
     h += '</tr></thead><tbody>';
 
     const row = (label, fn) => {
@@ -428,80 +490,50 @@
     const icoDir = '<svg viewBox="0 0 24 24"><path d="M6 18L18 6M18 6h-8M18 6v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     const icoDrop = '<svg viewBox="0 0 24 24"><path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
 
-    row(icoSun, (r, i) => `<td class="${cellCls(i, 'icon')}">${weatherIcon(r)}</td>`);
-    row(icoDir, (r, i) => `<td class="${cellCls(i, 'dir')}" title="${Math.round(r.wd)}°">${arrow(r.wd)}</td>`);
-    row(`${unitLabel()}<br><small>rüzgar</small>`, (r, i) => `<td class="${cellCls(i, 'c')}" style="background:${windColor(r.ws)}">${windVal(r.ws)}</td>`);
-    row(`${unitLabel()}<br><small>hamle</small>`, (r, i) => `<td class="${cellCls(i, 'c')}" style="background:${windColor(r.wg)}">${windVal(r.wg)}</td>`);
-    row('°C', (r, i) => `<td class="${cellCls(i, 'c')}" style="background:${tempColor(r.temp)}">${r.temp != null ? Math.round(r.temp) + '°' : '–'}</td>`);
-    row(`mm<br><small>/${precipWin}s</small>`, (r, i) => {
-      const p = r.precip;
-      const ph = r.precipH ?? 0;
-      const cls = ph >= 2 ? ' r3' : ph >= 0.6 ? ' r2' : p >= 0.1 ? ' r1' : '';
+    row(icoSun, (r, i) => `<td class="${cls(i, 'icon')}">${weatherIcon(r)}</td>`);
+    row(icoDir, (r, i) => `<td class="${cls(i, 'dir')}" title="${Math.round(r.wd)}°">${arrow(r.wd)}</td>`);
+    row(`${unitLabel()}<br><small>rüzgar</small>`, (r, i) => `<td class="${cls(i, 'c')}" style="background:${windColor(r.ws)}">${windVal(r.ws)}</td>`);
+    row(`${unitLabel()}<br><small>hamle</small>`, (r, i) => `<td class="${cls(i, 'c')}" style="background:${windColor(r.wg)}">${windVal(r.wg)}</td>`);
+    row('°C', (r, i) => `<td class="${cls(i, 'c')}" style="background:${tempColor(r.temp)}">${r.temp != null ? Math.round(r.temp) + '°' : '–'}</td>`);
+    row(`mm<br><small>/${state.step}s</small>`, (r, i) => {
+      const p = r.precip, ph = r.precipH ?? 0;
+      const c = ph >= 2 ? ' r3' : ph >= 0.6 ? ' r2' : p >= 0.1 ? ' r1' : '';
       const txt = p == null ? '–' : p < 0.1 ? '0' : p < 10 ? p.toFixed(1) : Math.round(p);
-      return `<td class="${cellCls(i, 'rain' + cls)}">${txt}</td>`;
+      return `<td class="${cls(i, 'rain' + c)}">${txt}</td>`;
     });
-    row(icoDrop + '<small>%</small>', (r, i) => `<td class="${cellCls(i, 'rh')}">${r.rh != null ? Math.round(r.rh) + '%' : '–'}</td>`);
+    row(icoDrop + '<small>%</small>', (r, i) => `<td class="${cls(i, 'rh')}">${r.rh != null ? Math.round(r.rh) + '%' : '–'}</td>`);
     h += '</tbody></table>';
-
-    const prevLeft = fc.scrollLeft, hadTable = !!fc.querySelector('table');
     fc.innerHTML = h;
-    fc.scrollLeft = hadTable ? prevLeft : 0;
 
-    state.focus = rows[Math.max(nowIdx, 0)];
-    renderCompass(state.focus);
+    // Şimdiki / odaktaki saati görünür yap
+    const th = fc.querySelector(`thead th[data-i="${focusIdx}"]`);
+    const lblW = fc.querySelector('.lbl').offsetWidth;
+    if (th && th.offsetLeft + th.offsetWidth > fc.clientWidth) fc.scrollLeft = th.offsetLeft - lblW - th.offsetWidth;
+    else fc.scrollLeft = 0;
+
+    // Bir saate dokununca pusula ve harita işaretleri o saati göstersin
     fc.querySelector('table').addEventListener('click', e => {
       const cell = e.target.closest('td,th');
       if (!cell || cell.classList.contains('lbl')) return;
-      const idx = [...cell.parentNode.children].indexOf(cell) - 1;
-      if (cell.closest('tr.days')) return;
-      const r = rows[idx];
-      if (r) { state.focus = r; renderCompass(r); }
+      const r = rows[[...cell.parentNode.children].indexOf(cell) - 1];
+      if (!r) return;
+      state.focusT = r.t;
+      fc.querySelectorAll('thead th.focus').forEach(x => x.classList.remove('focus'));
+      fc.querySelector(`thead th[data-i="${rows.indexOf(r)}"]`)?.classList.add('focus');
+      paintBadges();
     });
-  }
-
-  function renderDays(loc) {
-    const strip = $('#dayStrip');
-    strip.innerHTML = '';
-    const byDay = new Map();
-    for (const r of state.rows) {
-      if (!byDay.has(r.p.key)) byDay.set(r.p.key, []);
-      byDay.get(r.p.key).push(r);
-    }
-    for (const [key, rs] of byDay) {
-      const p = rs[0].p;
-      const we = p.wd === 'Sat' || p.wd === 'Sun';
-      // Gün içindeki rüzgar dağılımını renk şeridi olarak göster
-      const stops = rs.map((r, i) => `${windColor(r.ws)} ${Math.round(i / Math.max(rs.length - 1, 1) * 100)}%`).join(',');
-      const b = el('button', { class: `day${we ? ' we' : ''}`, 'data-day': key },
-        `<span class="dn">${TR_DAY[p.wd] || p.wd}</span><span class="dd">${p.d}</span><span class="bar" style="background:linear-gradient(90deg,${stops})"></span>`);
-      b.addEventListener('click', () => {
-        const fc = $('#forecast');
-        const th = fc.querySelector(`thead tr.hours th[data-i="${state.rows.indexOf(rs[0])}"]`);
-        if (th) fc.scrollTo({ left: th.offsetLeft - fc.querySelector('.lbl').offsetWidth, behavior: 'smooth' });
-      });
-      strip.append(b);
-    }
-    syncActiveDay();
-  }
-
-  function syncActiveDay() {
-    const fc = $('#forecast');
-    const lblW = fc.querySelector('.lbl')?.offsetWidth || 0;
-    const ths = fc.querySelectorAll('thead tr.hours th[data-i]');
-    let idx = 0;
-    for (const th of ths) { if (th.offsetLeft - lblW <= fc.scrollLeft + 4) idx = +th.dataset.i; else break; }
-    const key = state.rows[idx]?.p.key;
-    document.querySelectorAll('.day').forEach(d => d.classList.toggle('active', d.dataset.day === key));
   }
 
   // ---------- Bölge ekleme ----------
   function addLoc({ name, lat, lon, tz }) {
-    const id = `${name.toLowerCase().replace(/[^a-z0-9ğüşöçı]+/g, '-')}-${Date.now().toString(36)}`;
-    state.locs.push({ id, name, lat: +(+lat).toFixed(4), lon: +(+lon).toFixed(4), tz: tz || null });
+    const id = `loc-${Date.now().toString(36)}`;
+    const loc = { id, name, lat: +(+lat).toFixed(4), lon: +(+lon).toFixed(4), tz: tz || null };
+    state.locs.push(loc);
     state.sel = id;
     saveLocs();
-    $('#addDlg').open && $('#addDlg').close();
-    renderLocBar(); centerMap(); load(); renderEditList();
+    if ($('#addDlg').open) $('#addDlg').close();
+    renderLocBar(); renderEditList(); focusSelected(); load();
+    getForecast(loc, state.model).then(d => { loc._data = d; paintBadges(); }).catch(() => {});
   }
 
   function openAdd() {
@@ -537,45 +569,47 @@
     ul.innerHTML = '';
     state.locs.forEach((l, i) => {
       const li = el('li', {}, `<span class="n">${esc(l.name)}<small>${l.lat.toFixed(3)}, ${l.lon.toFixed(3)}</small></span>`);
-      const mk = (txt, cls, fn, title) => { const b = el('button', { class: cls, title, 'aria-label': title }, txt); b.addEventListener('click', fn); li.append(b); };
+      const mk = (txt, c, fn, title) => { const b = el('button', { class: c, title, 'aria-label': title }, txt); b.addEventListener('click', fn); li.append(b); };
+      const swap = j => { [state.locs[j], state.locs[i]] = [state.locs[i], state.locs[j]]; saveLocs(); renderLocBar(); renderEditList(); };
       mk('✎', '', () => {
         const n = prompt('Yeni isim:', l.name);
-        if (n) { l.name = n; saveLocs(); renderLocBar(); renderEditList(); load(); }
+        if (n) { l.name = n; saveLocs(); renderLocBar(); renderEditList(); renderMarkers(); $('#locTitle').textContent = curLoc()?.name ?? ''; }
       }, 'Yeniden adlandır');
-      mk('↑', '', () => { if (i > 0) { [state.locs[i - 1], state.locs[i]] = [state.locs[i], state.locs[i - 1]]; saveLocs(); renderLocBar(); renderEditList(); } }, 'Yukarı');
-      mk('↓', '', () => { if (i < state.locs.length - 1) { [state.locs[i + 1], state.locs[i]] = [state.locs[i], state.locs[i + 1]]; saveLocs(); renderLocBar(); renderEditList(); } }, 'Aşağı');
+      mk('↑', '', () => { if (i > 0) swap(i - 1); }, 'Yukarı');
+      mk('↓', '', () => { if (i < state.locs.length - 1) swap(i + 1); }, 'Aşağı');
       mk('🗑', 'del', () => {
         if (!confirm(`“${l.name}” silinsin mi?`)) return;
         state.locs.splice(i, 1);
         if (state.sel === l.id) state.sel = state.locs[0]?.id ?? null;
-        saveLocs(); renderLocBar(); renderEditList(); centerMap(); load();
+        saveLocs(); renderLocBar(); renderEditList(); renderMarkers(); load();
       }, 'Sil');
       ul.append(li);
     });
   }
-  function syncSeg(id, val) {
-    document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('active', b.dataset.v === String(val)));
-  }
+  const syncSeg = (id, val) => document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('active', b.dataset.v === String(val)));
 
   // ---------- Olaylar ----------
   function bind() {
-    $('#refreshBtn').addEventListener('click', () => { load({ force: true }); });
+    $('#refreshBtn').addEventListener('click', () => refresh({ force: true }));
+    $('#prevDay').addEventListener('click', () => changeDay(-1));
+    $('#nextDay').addEventListener('click', () => changeDay(1));
+    document.addEventListener('keydown', e => {
+      if (document.querySelector('dialog[open]')) return;
+      if (e.key === 'ArrowLeft') changeDay(-1);
+      if (e.key === 'ArrowRight') changeDay(1);
+    });
+    $('#fitBtn').addEventListener('click', () => fitAll());
     $('#settingsBtn').addEventListener('click', () => {
       renderEditList(); syncSeg('unitSeg', state.unit); syncSeg('stepSeg', state.step);
-      $('#windyKey').value = state.windyKey;
       $('#settingsDlg').showModal();
     });
     $('#unitSeg').addEventListener('click', e => {
       const v = e.target.dataset.v; if (!v) return;
-      state.unit = v; store.set('unit', v); syncSeg('unitSeg', v); load(); updateBadges();
+      state.unit = v; store.set('unit', v); syncSeg('unitSeg', v); load(); paintBadges();
     });
     $('#stepSeg').addEventListener('click', e => {
       const v = +e.target.dataset.v; if (!v) return;
       state.step = v; store.set('step', v); syncSeg('stepSeg', v); load();
-    });
-    $('#windyKey').addEventListener('change', e => {
-      state.windyKey = e.target.value.trim(); store.set('windyKey', state.windyKey);
-      memCache.clear(); load(); updateBadges();
     });
     $('#searchInput').addEventListener('input', e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => doSearch(e.target.value), 350); });
     $('#gpsBtn').addEventListener('click', () => {
@@ -597,9 +631,12 @@
       if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return alert('Geçerli enlem/boylam gir.');
       addLoc({ name, lat, lon });
     });
-    let raf;
-    $('#forecast').addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(syncActiveDay); }, { passive: true });
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+    // Uygulamaya geri dönünce: veri 30 dk'dan eskiyse yenile, gün değiştiyse bugüne dön
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return;
+      state.dayKey = null; state.focusT = null;
+      refresh();
+    });
   }
 
   // ---------- Başlat ----------
@@ -607,7 +644,7 @@
   renderModels();
   renderLocBar();
   initMap();
-  load();
+  refresh({ force: true });
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('sw.js').catch(() => { /* yoksay */ });
   }

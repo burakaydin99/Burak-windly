@@ -30,7 +30,9 @@
   <!-- Harita + rüzgar pusulası -->
   <section class="mapwrap" id="mapWrap">
     <div id="map"></div>
-    <div class="compass" id="compass" aria-hidden="true"></div>
+    <button class="map-btn" id="fitBtn" title="Tüm bölgeleri göster" aria-label="Tüm bölgeleri göster">
+      <svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
     <div class="pick-banner" id="pickBanner" hidden>
       Haritada bir noktaya dokun
       <button id="pickCancel">Vazgeç</button>
@@ -44,7 +46,15 @@
   </div>
 
   <!-- Gün şeridi -->
-  <div class="daystrip" id="dayStrip"></div>
+  <div class="daynav" id="dayNav">
+    <button class="nav-btn" id="prevDay" aria-label="Önceki gün">
+      <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="dayinfo" id="dayInfo"></div>
+    <button class="nav-btn" id="nextDay" aria-label="Sonraki gün">
+      <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
 
   <!-- Saatlik tablo (yana kaydırmalı) -->
   <main class="forecast" id="forecast">
@@ -94,13 +104,11 @@
       <button data-v="1">1 saat</button><button data-v="3">3 saat</button>
     </div>
 
-    <h3>Windy API anahtarı</h3>
+    <h3>Veri</h3>
     <p class="hint">
-      Veriler Windy Point Forecast API'den alınır
-      (<a href="https://api.windy.com/keys" target="_blank" rel="noopener">api.windy.com/keys</a> → “Point Forecast API”).
-      Anahtar yoksa veya model Windy API'de yoksa aynı modeller Open-Meteo'dan çekilir.
+      Yenile'ye bastığında seçili modelin 7 günlük tahmini anahtarsız olarak canlı çekilir
+      (<a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>, Windy'nin de kullandığı GFS / ECMWF / ICON modelleri).
     </p>
-    <input id="windyKey" type="text" placeholder="Windy Point Forecast API key" autocomplete="off" spellcheck="false">
   </dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
