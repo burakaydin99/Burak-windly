@@ -55,7 +55,6 @@ button { font: inherit; color: inherit; cursor: pointer; }
 }
 .chip .w { font-size: 11px; font-weight: 700; padding: 0 4px; border-radius: 4px; color: #111; line-height: 16px; }
 .chip.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-.chip.add { border-style: dashed; color: var(--muted); }
 
 /* Harita */
 .mapwrap { position: relative; flex: 1 1 26vh; max-height: 34vh; min-height: 140px; transition: height .25s; }
@@ -240,11 +239,14 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 
 /* Üst bölge etiketleri: sadece isim, küçük punto */
 .chip { font-size: 12px; padding: 3px 8px; line-height: 18px; }
-.chip.add {
-  width: 26px; height: 26px; padding: 0; justify-content: center; flex: none;
-  background: #4aa3ff; border-color: #4aa3ff; color: #fff; border-style: solid;
-  font-size: 20px; font-weight: 600; line-height: 1; border-radius: 6px;
+/* Bölge ekle: açık mavi kare, ortalı beyaz + (yenile düğmesinin yanında) */
+.add-btn {
+  flex: none; width: 28px; height: 28px; margin: 0 4px 0 6px; padding: 0; border: 0; border-radius: 6px;
+  background: #4aa3ff; color: #fff; display: grid; place-items: center;
 }
+.add-btn svg { width: 16px; height: 16px; display: block; }
+.add-btn:active { filter: brightness(.9); }
+.add-btn:focus:not(:focus-visible) { outline: none; }
 /* Gün satırı: bugün yeşil */
 .dayinfo .t.is-today { color: var(--accent); }
 /* Alt kaynak satırı */
