@@ -104,11 +104,32 @@
       <button data-v="1">1 saat</button><button data-v="3">3 saat</button>
     </div>
 
-    <h3>Veri</h3>
-    <p class="hint">
-      Yenile'ye bastığında seçili modelin 7 günlük tahmini anahtarsız olarak canlı çekilir
-      (<a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a>, Windy'nin de kullandığı GFS / ECMWF / ICON modelleri).
+    <h3>Veri kaynağı</h3>
+    <div class="seg" id="srcSeg">
+      <button data-v="openmeteo">Open-Meteo</button><button data-v="infoplaza">Infoplaza</button>
+    </div>
+    <p class="hint" id="srcHintOm">
+      Anahtarsız, canlı. Windy'nin de kullandığı GFS / ECMWF / ICON modelleri
+      (<a href="https://open-meteo.com" target="_blank" rel="noopener">open-meteo.com</a>).
     </p>
+    <div id="ipBox" hidden>
+      <p class="hint">
+        Infoplaza hesabındaki dokümanda veya panelde bulunan <b>forecast (tahmin) isteğinin örnek adresini</b> aşağıya yapıştır.
+        Uygulama adresteki enlem/boylamı seçili bölgeyle değiştirir ve yanıttaki rüzgar, hamle, yön, sıcaklık ve yağış alanlarını kendisi bulur.
+        Adreste <code>{lat}</code>, <code>{lon}</code> ve <code>{token}</code> yer tutucularını da kullanabilirsin.
+      </p>
+      <textarea id="ipUrl" rows="3" placeholder="https://…infoplaza…/forecast?latitude=…&amp;longitude=…&amp;token=…" spellcheck="false"></textarea>
+      <input id="ipToken" type="password" placeholder="Token (adreste yoksa)" autocomplete="off" spellcheck="false">
+      <div class="ip-row">
+        <label>Rüzgar birimi (kaynak)</label>
+        <select id="ipWindUnit">
+          <option value="ms">m/sn</option><option value="kmh">km/s</option><option value="kt">knot</option>
+        </select>
+      </div>
+      <button class="btn primary" id="ipTest">Bağlantıyı test et</button>
+      <pre class="ip-out" id="ipOut" hidden></pre>
+      <p class="hint">Infoplaza'dan veri alınamazsa uygulama otomatik olarak Open-Meteo'ya geçer ve bunu üstte belirtir.</p>
+    </div>
   </dialog>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>

@@ -27,6 +27,8 @@
     model: store.get('model', 'gfs'),
     unit: store.get('unit', 'kmh'),
     step: store.get('step', 3),
+    source: store.get('source', 'openmeteo'),
+    ip: store.get('ip', { url: '', token: '', windUnit: 'ms' }),
     rows: [],          // seçili bölgenin tüm satırları (7 gün)
     days: [],          // [{key, rows}]
     dayKey: null,      // gösterilen gün (null = bugün)
@@ -174,25 +176,169 @@
       ws: h.wind_speed_10m[i], wg: h.wind_gusts_10m?.[i], wd: h.wind_direction_10m[i],
       temp: h.temperature_2m[i], precip: h.precipitation?.[i], cloud: h.cloud_cover?.[i], rh: h.relative_humidity_2m?.[i],
     })).filter(r => r.ws != null && r.temp != null);
-    return { hours, tz: j.timezone };
+    return { hours, tz: j.timezone, source: 'Open-Meteo' };
+  }
+
+
+  // ---------- Infoplaza (kullanıcının hesabıyla) ----------
+  // Kullanıcının yapıştırdığı örnek istek adresinden seçili bölge için URL üret.
+  function ipBuildUrl(loc) {
+    const cfg = state.ip;
+    let raw = (cfg.url || '').trim();
+    if (!raw) throw new Error('Ayarlar’da Infoplaza istek adresi boş');
+    raw = raw.replace(/\{lat\}/gi, loc.lat).replace(/\{lon\}|\{lng\}/gi, loc.lon).replace(/\{token\}/gi, encodeURIComponent(cfg.token || ''));
+    const u = new URL(raw);
+    const keys = [...u.searchParams.keys()];
+    const latK = keys.find(k => /^(lat|latitude)$/i.test(k));
+    const lonK = keys.find(k => /^(lon|lng|long|longitude)$/i.test(k));
+    if (latK) u.searchParams.set(latK, loc.lat);
+    if (lonK) u.searchParams.set(lonK, loc.lon);
+    if (!latK && !lonK && !/\{lat\}/i.test(cfg.url)) {
+      // Koordinatlar yolun içinde olabilir: …/52.1,5.2 veya …/52.1/5.2
+      const m = u.pathname.match(/(-?\d{1,2}\.\d+)([,/])(-?\d{1,3}\.\d+)/);
+      if (m) u.pathname = u.pathname.replace(m[0], `${loc.lat}${m[2]}${loc.lon}`);
+      else { u.searchParams.set('latitude', loc.lat); u.searchParams.set('longitude', loc.lon); }
+    }
+    if (cfg.token) {
+      const tk = keys.find(k => /^(token|apikey|api_key|key|access_token)$/i.test(k));
+      u.searchParams.set(tk || 'token', cfg.token);
+    }
+    return u.toString();
+  }
+
+  const norm = k => k.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const FIELD_RULES = {
+    t:      k => /^(time|date|datetime|validtime|validdate|timestamp|dt|ts|utc|localtime|forecasttime|validfrom|from|start|starttime|period)$/.test(k) || /(time|date)$/.test(k) && !/sun|moon|run|issue|created|updated|model/.test(k),
+    wg:     k => /gust/.test(k) && !/dir|bearing/.test(k),
+    wd:     k => /(wind)?(bearing|direction|dir)$/.test(k) && !/gust/.test(k) || k === 'winddirection' || k === 'wdir',
+    ws:     k => /^(windspeed|wind|ws|windspd|windspeed10m|wspd|speed)$/.test(k) || /wind.*(speed|spd)/.test(k) && !/gust|max/.test(k),
+    temp:   k => /^(temp|temperature|t2m|airtemperature|temperature2m|tmp)$/.test(k) || /temp/.test(k) && !/feel|dew|apparent|min|max|sea|water|soil|wetbulb|chill/.test(k),
+    precip: k => /(precip|rain)/.test(k) && !/prob|chance|pct|percent|type|duration|hours/.test(k),
+    cloud:  k => /cloud/.test(k) && !/base|type/.test(k),
+    rh:     k => /humid/.test(k),
+  };
+  const numOf = v => {
+    if (v == null) return null;
+    if (typeof v === 'object') v = v.value ?? v.val ?? v.avg ?? v.mean ?? null;
+    const n = typeof v === 'string' ? parseFloat(v) : v;
+    return typeof n === 'number' && isFinite(n) ? n : null;
+  };
+  const timeOf = v => {
+    if (v == null) return null;
+    if (typeof v === 'object') v = v.value ?? v.utc ?? v.iso ?? null;
+    if (typeof v === 'number') return v < 1e12 ? v * 1000 : v;
+    const ms = Date.parse(v);
+    return isNaN(ms) ? null : ms;
+  };
+
+  // JSON içinde zaman serisi tablosunu bul: nesne dizisi veya eşit uzunlukta dizilerden oluşan sütunlar.
+  function ipFindSeries(j) {
+    const cands = [];
+    const walk = (o, path, depth) => {
+      if (!o || typeof o !== 'object' || depth > 6) return;
+      if (Array.isArray(o)) {
+        if (o.length >= 2 && o.every(x => x && typeof x === 'object' && !Array.isArray(x))) cands.push({ kind: 'rows', rows: o, path });
+        o.slice(0, 3).forEach((x, i) => walk(x, `${path}[${i}]`, depth + 1));
+        return;
+      }
+      const arrKeys = Object.keys(o).filter(k => Array.isArray(o[k]) && o[k].length >= 2 && o[k].every(x => x == null || typeof x !== 'object' || ('value' in x)));
+      if (arrKeys.length >= 3) {
+        const n = Math.max(...arrKeys.map(k => o[k].length));
+        const rows = Array.from({ length: n }, (_, i) => Object.fromEntries(arrKeys.map(k => [k, o[k][i]])));
+        cands.push({ kind: 'cols', rows, path });
+      }
+      for (const k of Object.keys(o)) walk(o[k], path ? `${path}.${k}` : k, depth + 1);
+    };
+    walk(j, '', 0);
+    let best = null;
+    for (const c of cands) {
+      const flat = c.rows.map(r => flatten(r));
+      const map = mapFields(flat);
+      const score = (map.t ? 10 : 0) + (map.ws ? 10 : 0) + Object.keys(map).length + Math.min(c.rows.length, 400) / 100;
+      if (map.t && map.ws && (!best || score > best.score)) best = { ...c, flat, map, score };
+    }
+    return best;
+  }
+  // İç içe nesneleri tek seviyeye indir: {wind:{speed:3}} → {windspeed:3}
+  function flatten(o, pre = '', out = {}) {
+    for (const [k, v] of Object.entries(o)) {
+      const nk = pre + norm(k);
+      if (v && typeof v === 'object' && !Array.isArray(v) && !('value' in v)) flatten(v, nk, out);
+      else out[nk] = v;
+    }
+    return out;
+  }
+  function mapFields(flat) {
+    const keys = [...new Set(flat.slice(0, 5).flatMap(Object.keys))];
+    const map = {};
+    for (const f of ['t', 'wg', 'wd', 'ws', 'temp', 'precip', 'cloud', 'rh']) {
+      const used = new Set(Object.values(map));
+      const k = keys.find(k => !used.has(k) && FIELD_RULES[f](k) && (f === 't' ? flat.some(r => timeOf(r[k]) != null) : flat.some(r => numOf(r[k]) != null)));
+      if (k) map[f] = k;
+    }
+    return map;
+  }
+
+  async function fetchInfoplaza(loc, { raw = false } = {}) {
+    const url = ipBuildUrl(loc);
+    let res;
+    try { res = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/json' } }); }
+    catch (e) { throw new Error('Bağlantı kurulamadı (ağ veya CORS engeli)'); }
+    const text = await res.text();
+    if (!res.ok) throw new Error(`Infoplaza HTTP ${res.status}${text ? ': ' + text.slice(0, 160) : ''}`);
+    let j;
+    try { j = JSON.parse(text); } catch { throw new Error('Yanıt JSON değil: ' + text.slice(0, 120)); }
+    const series = ipFindSeries(j);
+    if (!series) throw new Error('Yanıtta zaman + rüzgar hızı içeren bir seri bulunamadı');
+    const m = series.map;
+    const wf = { ms: 3.6, kmh: 1, kt: 1.852 }[state.ip.windUnit || 'ms'];
+    const hours = series.flat.map(r => {
+      const temp = numOf(r[m.temp]);
+      const ws = numOf(r[m.ws]), wg = numOf(r[m.wg]);
+      let cloud = numOf(r[m.cloud]);
+      if (cloud != null && cloud <= 8 && /okta/.test(m.cloud)) cloud = cloud / 8 * 100;
+      else if (cloud != null && cloud <= 1 && series.flat.every(x => (numOf(x[m.cloud]) ?? 0) <= 1)) cloud *= 100;
+      return {
+        t: timeOf(r[m.t]),
+        ws: ws != null ? ws * wf : null,
+        wg: wg != null ? wg * wf : null,
+        wd: numOf(r[m.wd]),
+        temp: temp != null && temp > 150 ? temp - 273.15 : temp,
+        precip: numOf(r[m.precip]),
+        cloud, rh: numOf(r[m.rh]),
+      };
+    }).filter(r => r.t != null && r.ws != null).sort((a, b) => a.t - b.t);
+    if (!hours.length) throw new Error('Seride geçerli satır yok');
+    const out = { hours, tz: null, source: 'Infoplaza' };
+    if (raw) out.debug = { url, path: series.path || '(kök)', map: m, sample: series.rows[0], n: hours.length };
+    return out;
   }
 
   // Aynı bölge için eşzamanlı istekleri tek istekte birleştir
   const inflight = new Map();
   function getForecast(loc, modelId, opts = {}) {
-    const key = `${loc.lat},${loc.lon}|${modelId}|${opts.force ? 1 : 0}`;
+    const key = `${loc.lat},${loc.lon}|${state.source}|${modelId}|${opts.force ? 1 : 0}`;
     if (!inflight.has(key)) inflight.set(key, fetchForecast(loc, modelId, opts).finally(() => inflight.delete(key)));
     return inflight.get(key);
   }
 
   async function fetchForecast(loc, modelId, { force = false } = {}) {
     const model = MODELS.find(m => m.id === modelId);
-    const key = `${loc.lat},${loc.lon}|${modelId}`;
+    const src = state.source;
+    const key = `${loc.lat},${loc.lon}|${src === 'infoplaza' ? 'ip' : modelId}`;
     const c = memCache.get(key);
     if (!force && c && Date.now() - c.at < CACHE_MS) return c.data;
     let data;
     try {
-      data = await fetchOpenMeteo(loc, model);
+      if (src === 'infoplaza') {
+        try { data = await fetchInfoplaza(loc); }
+        catch (e) {
+          // Infoplaza olmazsa Open-Meteo'ya geç, sebebini göster
+          data = await fetchOpenMeteo(loc, model);
+          data.fallback = e.message;
+        }
+      } else data = await fetchOpenMeteo(loc, model);
+      data.source ||= 'Open-Meteo';
       data.at = Date.now();
       data.offline = false;
       store.set(`fc:${key}`, data);
@@ -366,6 +512,7 @@
   function renderModels() {
     const t = $('#modelTabs');
     t.innerHTML = '';
+    t.hidden = state.source === 'infoplaza';
     for (const m of MODELS) {
       t.append(el('button', {
         class: m.id === state.model ? 'active' : '',
@@ -413,9 +560,11 @@
       const todayKey = tparts(Date.now(), loc.tz).key;
       if (!state.days.find(d => d.key === state.dayKey)) state.dayKey = null;
       if (!state.dayKey) state.dayKey = (state.days.find(d => d.key === todayKey) || state.days[0])?.key;
-      $('#sourceTag').innerHTML = data.offline
-        ? `${model.label} · çevrimdışı<br>son veri ${hhmm(data.at, loc.tz)}`
-        : `${model.label} · canlı<br>güncellendi ${hhmm(data.at, loc.tz)}`;
+      const label = data.source === 'Infoplaza' ? 'Infoplaza' : `Open-Meteo · ${model.label}`;
+      $('#sourceTag').innerHTML = (data.offline
+        ? `${label} · çevrimdışı<br>son veri ${hhmm(data.at, loc.tz)}`
+        : `${label} · canlı<br>güncellendi ${hhmm(data.at, loc.tz)}`)
+        + (data.fallback ? `<br><span class="warn" title="${esc(data.fallback)}">Infoplaza alınamadı</span>` : '');
       renderDay(true);
       paintBadges();
     } catch (err) {
@@ -610,6 +759,45 @@
     $('#stepSeg').addEventListener('click', e => {
       const v = +e.target.dataset.v; if (!v) return;
       state.step = v; store.set('step', v); syncSeg('stepSeg', v); load();
+    });
+    // Veri kaynağı
+    const syncSrc = () => {
+      syncSeg('srcSeg', state.source);
+      $('#ipBox').hidden = state.source !== 'infoplaza';
+      $('#srcHintOm').hidden = state.source === 'infoplaza';
+    };
+    $('#settingsBtn').addEventListener('click', () => {
+      syncSrc();
+      $('#ipUrl').value = state.ip.url || ''; $('#ipToken').value = state.ip.token || ''; $('#ipWindUnit').value = state.ip.windUnit || 'ms';
+      $('#ipOut').hidden = true;
+    });
+    $('#srcSeg').addEventListener('click', e => {
+      const v = e.target.dataset.v; if (!v) return;
+      state.source = v; store.set('source', v); syncSrc(); renderModels(); refresh({ force: true });
+    });
+    const saveIp = () => {
+      state.ip = { url: $('#ipUrl').value.trim(), token: $('#ipToken').value.trim(), windUnit: $('#ipWindUnit').value };
+      store.set('ip', state.ip); memCache.clear();
+    };
+    ['ipUrl', 'ipToken', 'ipWindUnit'].forEach(id => $('#' + id).addEventListener('change', () => { saveIp(); if (state.source === 'infoplaza') refresh({ force: true }); }));
+    $('#ipTest').addEventListener('click', async () => {
+      saveIp();
+      const out = $('#ipOut');
+      out.hidden = false; out.className = 'ip-out'; out.textContent = 'Test ediliyor…';
+      const loc = curLoc() || { lat: 41.0, lon: 29.0 };
+      try {
+        const d = await fetchInfoplaza(loc, { raw: true });
+        const f = d.hours[0], names = { t: 'zaman', ws: 'rüzgar', wg: 'hamle', wd: 'yön', temp: 'sıcaklık', precip: 'yağış', cloud: 'bulut', rh: 'nem' };
+        const fmt = v => v == null ? '–' : Math.round(v * 10) / 10;
+        out.textContent = `✓ ${d.debug.n} zaman adımı bulundu (${d.debug.path})\n` +
+          `İlk: ${new Date(f.t).toLocaleString('tr-TR')} → son: ${new Date(d.hours[d.hours.length - 1].t).toLocaleString('tr-TR')}\n\n` +
+          'Eşleşen alanlar:\n' + Object.entries(names).map(([k, n]) => `  ${n.padEnd(9)}: ${d.debug.map[k] || '(bulunamadı)'}`).join('\n') +
+          `\n\nİlk satır → rüzgar ${fmt(f.ws)} km/s, hamle ${fmt(f.wg)} km/s, yön ${fmt(f.wd)}°, ${fmt(f.temp)}°C, yağış ${fmt(f.precip)} mm\n\n` +
+          'Ham ilk kayıt:\n' + JSON.stringify(d.debug.sample, null, 1).slice(0, 800);
+      } catch (e) {
+        out.className = 'ip-out err';
+        out.textContent = '✗ ' + e.message;
+      }
     });
     $('#searchInput').addEventListener('input', e => { clearTimeout(searchTimer); searchTimer = setTimeout(() => doSearch(e.target.value), 350); });
     $('#gpsBtn').addEventListener('click', () => {

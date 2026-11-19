@@ -18,11 +18,17 @@ Windy / Windguru tarzı, telefona uygun bir rüzgar tahmin uygulaması.
   - zaman adımı (1 veya 3 saat)
   - bölgeleri yeniden adlandırma, sıralama, silme
 
-## Veri kaynağı
+## Veri kaynakları (Ayarlar → Veri kaynağı)
 
-Veriler API anahtarı gerekmeden, canlı olarak [Open-Meteo](https://open-meteo.com)'dan çekilir. Open-Meteo, Windy'nin de kullandığı GFS, ECMWF ve ICON modellerini sunar. Yenile'ye basıldığında tüm kayıtlı bölgelerin 7 günlük tahmini yeniden alınır. İnternet yoksa en son çekilen veri “çevrimdışı” etiketiyle gösterilir.
+1. **Open-Meteo** (varsayılan): API anahtarı gerektirmez, veriler canlı gelir. Windy'nin de kullandığı GFS, ECMWF ve ICON modellerini sunar.
+2. **Infoplaza**: Kendi hesabınla çalışır. Kurulumu:
+   - Infoplaza dokümanındaki veya panelindeki forecast isteğinin örnek adresini yapıştır.
+   - Token adreste yoksa ayrı alana gir. Adreste `{lat}`, `{lon}` ve `{token}` yer tutucuları da kullanılabilir.
+   - Uygulama adresteki enlem/boylamı her bölge için değiştirir. Yanıttaki zaman, rüzgar, hamle, yön, sıcaklık, yağış, bulut ve nem alanlarını kendisi bulur.
+   - “Bağlantıyı test et” düğmesi bulunan alanları ve ilk satırın değerlerini gösterir. Kaynağın rüzgar birimi (varsayılan m/sn) ayarlardan değiştirilebilir.
+   - Infoplaza'dan veri alınamazsa uygulama Open-Meteo'ya geçer ve bunu üstte belirtir.
 
-Kayıtlı bölgeler ve ayarlar tarayıcıda (localStorage) saklanır.
+Yenile'ye basıldığında tüm kayıtlı bölgelerin 7 günlük tahmini yeniden alınır. İnternet yoksa en son çekilen veri “çevrimdışı” etiketiyle gösterilir. Kayıtlı bölgeler, ayarlar ve token tarayıcıda (localStorage) saklanır.
 
 ## Çalıştırma
 

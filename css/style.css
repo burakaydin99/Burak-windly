@@ -179,3 +179,19 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 .edit-list li small { color: var(--muted); display: block; font-size: 11px; }
 .edit-list button { background: var(--bg3); border: 0; border-radius: 8px; width: 34px; height: 34px; }
 .edit-list button.del { color: #ff8f80; }
+
+/* Infoplaza ayarları */
+.sheet textarea, .sheet select {
+  width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg2); color: var(--text); font: 14px ui-monospace, monospace; resize: vertical;
+}
+.sheet select { font: 15px system-ui, sans-serif; width: auto; }
+#ipBox > * + * { margin-top: 8px; }
+.ip-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 14px; }
+.ip-out {
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: 12px;
+  white-space: pre-wrap; word-break: break-word; max-height: 240px; overflow: auto; color: var(--text);
+}
+.ip-out.err { color: #ff8f80; }
+.hint code { background: var(--bg2); padding: 0 4px; border-radius: 4px; }
+.source .warn { color: #ffb36b; }
