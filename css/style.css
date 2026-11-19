@@ -259,13 +259,19 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 
 /* Gün satırı: en düşük / en yüksek sıcaklık */
 
-/* Gün satırı kutuları: iki renge bölünmüş tek dikdörtgen + yağış kutusu */
-.dayinfo .dbox { display: inline-flex; align-items: stretch; border-radius: 5px; overflow: hidden; line-height: 20px; }
-.dayinfo .dbox b { border-radius: 0; padding: 0 6px; }
-.dayinfo .dbox b + b { border-left: 1px solid #fff; }
-.dayinfo .dbox sup { font-size: 9px; vertical-align: 5px; margin-left: 1px; }
-.dayinfo .rbox {
-  display: inline-flex; align-items: center; gap: 3px; line-height: 20px; padding: 0 7px 0 5px; border-radius: 5px;
-  background: #3f7fe0; color: #fff; font-weight: 700; font-size: 13px;
+/* Gün satırı kutuları: hepsi aynı yükseklikte, rakamlar aynı taban çizgisinde */
+.dayinfo { align-items: baseline; }
+.dayinfo .dbox, .dayinfo .rbox {
+  display: inline-flex; align-items: baseline; height: 22px; line-height: 22px; border-radius: 5px; overflow: hidden;
+  font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
 }
-.dayinfo .rbox svg { width: 11px; height: 11px; }
+.dayinfo .dbox b { display: block; height: 22px; line-height: 22px; padding: 0 6px; border-radius: 0; font-size: 13px; }
+.dayinfo .dbox b + b { border-left: 1px solid #fff; }
+/* Sıcaklık kutusu: derece işareti sağ üst köşede */
+.dayinfo .dbox.deg { position: relative; }
+.dayinfo .dbox.deg b:last-child { padding-right: 10px; }
+.dayinfo .dbox.deg::after {
+  content: "°"; position: absolute; top: 1px; right: 3px; font-size: 11px; line-height: 1; color: #111; font-weight: 700;
+}
+.dayinfo .rbox { gap: 3px; padding: 0 7px 0 5px; background: #3f7fe0; color: #fff; }
+.dayinfo .rbox svg { width: 11px; height: 11px; align-self: center; }
