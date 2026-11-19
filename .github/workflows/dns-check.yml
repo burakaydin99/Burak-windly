@@ -10,6 +10,11 @@ jobs:
       - run: |
           echo "CNAME:"; dig +short CNAME w.burakaydin.one @1.1.1.1
           echo "A:";     dig +short A w.burakaydin.one @1.1.1.1
+          echo "AAAA:";  dig +short AAAA w.burakaydin.one @1.1.1.1
+          echo "CAA (w):"; dig +short CAA w.burakaydin.one @1.1.1.1
+          echo "CAA (kök):"; dig +short CAA burakaydin.one @1.1.1.1
+          echo "NS:"; dig +short NS burakaydin.one @1.1.1.1
+          echo "Sunucu:"; curl -sSI http://w.burakaydin.one/ | grep -iE "^(server|cf-ray|location):" || true
           echo "HTTP:";  curl -sS -o /dev/null -w "%{http_code} %{redirect_url}\n" http://w.burakaydin.one/ || true
           echo "HTTPS:"; curl -sS -o /dev/null -w "%{http_code}\n" https://w.burakaydin.one/ || true
           echo "github.io:"; curl -sS -o /dev/null -w "%{http_code} %{redirect_url}\n" https://burakaydin99.github.io/Burak-windly/ || true
