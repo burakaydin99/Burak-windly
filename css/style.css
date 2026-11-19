@@ -121,10 +121,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   white-space: nowrap; overflow: hidden; font-size: 15px;
 }
 .dayinfo .t { font-weight: 600; }
-.dayinfo .we { color: var(--accent); }
 .dayinfo b { color: #111; padding: 0 5px; border-radius: 5px; font-weight: 700; font-size: 13px; }
 .dayinfo .m { color: var(--muted); font-size: 13px; }
-.dayinfo .today { font-size: 10px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 5px; padding: 1px 5px; }
 
 /* Tablo */
 .forecast { flex: 0 1 auto; min-height: 0; overflow: auto; position: relative; overscroll-behavior: contain; border-top: 1px solid var(--line); }
@@ -237,3 +235,20 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 .pin.sel .pill { font-size: 14px; line-height: 20px; box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0,0,0,.5); }
 .pin.sel .pill .pd svg { width: 15px; height: 15px; }
 .pin.sel .pn { font-size: 12px; font-weight: 700; }
+
+/* Üst bölge etiketleri: sadece isim, küçük punto */
+.chip { font-size: 12px; padding: 3px 8px; line-height: 18px; }
+.chip.add {
+  width: 26px; height: 26px; padding: 0; justify-content: center; flex: none;
+  background: #4aa3ff; border-color: #4aa3ff; color: #fff; border-style: solid;
+  font-size: 20px; font-weight: 600; line-height: 1; border-radius: 6px;
+}
+/* Gün satırı: bugün yeşil */
+.dayinfo .t.is-today { color: var(--accent); }
+/* Alt kaynak satırı */
+.srcbar {
+  flex: none; text-align: center; padding: 5px 10px calc(env(safe-area-inset-bottom) + 5px);
+  border-top: 1px solid var(--line); background: var(--bg);
+}
+.srcbar .source { display: block; margin: 0; text-align: center; font-size: 12px; }
+.modelbar { padding-top: 0; padding-bottom: 6px; }
