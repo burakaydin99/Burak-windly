@@ -199,25 +199,10 @@
     return `${base}${IP_PATH}?${new URLSearchParams(q)}`;
   }
 
-  async function fetchInfoplaza(loc) {
-    if (!state.ipProxy && !state.ipKey) throw new Error('Ayarlar’da aracı sunucu adresi veya api_key girilmemiş');
-    let res;
-    try { res = await fetch(ipUrl(loc), { cache: 'no-store' }); }
-    catch {
-      throw new Error(state.ipProxy
-        ? 'Aracı sunucuya bağlanılamadı — Worker adresini kontrol et'
-        : 'Infoplaza tarayıcıdan doğrudan çağrılmaya izin vermiyor (CORS). Ayarlar’a aracı sunucu (Worker) adresini gir.');
-    }
-    let j = null;
-    try { j = await res.json(); } catch { /* yoksay */ }
-    if (!res.ok || j?.success === false) {
-      const why = j?.message || j?.error?.message || j?.error || j?.meta?.message || '';
-      const hint = { 401: 'api_key geçersiz', 403: 'yetki yok', 429: 'kredi/limit aşıldı', 404: 'bulunamadı' }[res.status] || '';
-      throw new Error(`Infoplaza ${res.status}${hint ? ' – ' + hint : ''}${why ? ': ' + String(why).slice(0, 120) : ''}`);
-    }
-    const d = j?.data ?? j;
+  // Infoplaza "hourly" dizisini uygulamanın satır biçimine çevir
+  function ipParse(d) {
     const hourly = d?.hourly;
-    if (!Array.isArray(hourly) || !hourly.length) throw new Error('Infoplaza yanıtında saatlik veri yok');
+    if (!Array.isArray(hourly) || !hourly.length) throw new Error('Infoplaza verisinde saatlik tahmin yok');
     const n = v => (typeof v === 'number' && isFinite(v) ? v : null);
     const hours = hourly.map(h => ({
       t: h.time * 1000,
@@ -230,6 +215,43 @@
       rh: n(h.humidity) != null ? h.humidity * 100 : null,
     })).filter(r => r.ws != null && r.t).sort((a, b) => a.t - b.t);
     return { hours, tz: typeof d.timezone === 'string' ? d.timezone : null, source: 'Infoplaza' };
+  }
+
+  // Varsayılan yol: GitHub Actions Infoplaza'yı düzenli çekip data/infoplaza/ altına yazar;
+  // uygulama bu dosyaları kendi sitesinden okur (CORS sorunu yok, anahtar telefonda değil).
+  async function fetchInfoplazaFromSite(loc) {
+    let idx;
+    try {
+      const r = await fetch('data/infoplaza/index.json', { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      idx = await r.json();
+    } catch { throw new Error('Infoplaza verisi henüz oluşturulmamış (GitHub işi çalışmadı)'); }
+    const near = (idx.locations || [])
+      .map(e => ({ e, d: Math.hypot(e.lat - loc.lat, (e.lon - loc.lon) * Math.cos(loc.lat * Math.PI / 180)) }))
+      .sort((a, b) => a.d - b.d)[0];
+    if (!near || near.d > 0.03) throw new Error(`“${loc.name}” Infoplaza listesinde yok`);
+    if (near.e.error) throw new Error(`Infoplaza: ${near.e.error}`);
+    const r = await fetch(`data/infoplaza/${near.e.file}`, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`Infoplaza dosyası okunamadı (${r.status})`);
+    const out = ipParse(await r.json());
+    out.dataAt = near.e.fetchedAt ? Date.parse(near.e.fetchedAt) : null;
+    return out;
+  }
+
+  // İsteğe bağlı yol: kullanıcının kendi aracı sunucusu (Cloudflare Worker) üzerinden canlı
+  async function fetchInfoplaza(loc) {
+    if (!state.ipProxy) return fetchInfoplazaFromSite(loc);
+    let res;
+    try { res = await fetch(ipUrl(loc), { cache: 'no-store' }); }
+    catch { throw new Error('Aracı sunucuya bağlanılamadı — Worker adresini kontrol et'); }
+    let j = null;
+    try { j = await res.json(); } catch { /* yoksay */ }
+    if (!res.ok || j?.success === false) {
+      const why = j?.message || j?.error?.message || j?.error || j?.meta?.message || '';
+      const hint = { 401: 'api_key geçersiz', 403: 'yetki yok', 429: 'kredi/limit aşıldı', 404: 'bulunamadı' }[res.status] || '';
+      throw new Error(`Infoplaza ${res.status}${hint ? ' – ' + hint : ''}${why ? ': ' + String(why).slice(0, 120) : ''}`);
+    }
+    return ipParse(j?.data ?? j);
   }
 
   // Aynı bölge için eşzamanlı istekleri tek istekte birleştir
@@ -302,9 +324,10 @@
   function initMap() {
     if (!window.L) return;
     map = L.map('map', { zoomControl: false, attributionControl: true, tap: false });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap © CARTO',
-    }).addTo(map);
+    // Anahtarsız açık gri altlık + yer adları (Esri)
+    const esri = n => `https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${n}/MapServer/tile/{z}/{y}/{x}`;
+    L.tileLayer(esri('World_Light_Gray_Base'), { maxZoom: 16, attribution: 'Tiles © Esri — Esri, HERE, Garmin, © OpenStreetMap' }).addTo(map);
+    L.tileLayer(esri('World_Light_Gray_Reference'), { maxZoom: 16 }).addTo(map);
     map.on('click', onMapPick);
     fitAll(false);
   }
@@ -481,8 +504,10 @@
       const label = data.source === 'Infoplaza' ? 'Infoplaza' : `Open-Meteo · ${model.label}`;
       $('#sourceTag').innerHTML = (data.offline
         ? `${label} · çevrimdışı<br>son veri ${hhmm(data.at, loc.tz)}`
-        : `${label} · canlı<br>güncellendi ${hhmm(data.at, loc.tz)}`)
-        + (data.fallback ? `<br><span class="warn" title="${esc(data.fallback)}">Infoplaza alınamadı</span>` : '');
+        : data.dataAt
+          ? `${label}<br>${new Date(data.dataAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' })} ${hhmm(data.dataAt, loc.tz)} verisi`
+          : `${label} · canlı<br>güncellendi ${hhmm(data.at, loc.tz)}`)
+        + (data.fallback ? `<br><span class="warn">${esc(data.fallback)}</span>` : '');
       renderDay(true);
       paintBadges();
     } catch (err) {
@@ -684,7 +709,30 @@
       $('#ipBox').hidden = state.source !== 'infoplaza';
       $('#srcHintOm').hidden = state.source === 'infoplaza';
     };
-    $('#settingsBtn').addEventListener('click', () => { syncSrc(); $('#ipKey').value = state.ipKey; $('#ipProxy').value = state.ipProxy; $('#ipOut').hidden = true; });
+    const showIpStatus = async () => {
+      const box = $('#ipStatus');
+      try {
+        const r = await fetch('data/infoplaza/index.json', { cache: 'no-store' });
+        if (!r.ok) throw 0;
+        const idx = await r.json();
+        const when = t => new Date(t).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        box.className = 'ip-out';
+        box.textContent = `Son güncelleme: ${when(idx.updatedAt)}\n` +
+          (idx.locations || []).map(e => `${e.error ? '✗' : '✓'} ${e.name}${e.error ? ' — ' + e.error : ''}`).join('\n');
+      } catch {
+        box.className = 'ip-out err';
+        box.textContent = 'Henüz Infoplaza verisi yok. GitHub işinin çalışması için repo ayarlarında INFOPLAZA_KEY tanımlı olmalı.';
+      }
+    };
+    $('#settingsBtn').addEventListener('click', () => {
+      syncSrc(); $('#ipKey').value = state.ipKey; $('#ipProxy').value = state.ipProxy; $('#ipOut').hidden = true;
+      if (state.source === 'infoplaza') showIpStatus();
+    });
+    $('#ipCopy').addEventListener('click', async () => {
+      const txt = JSON.stringify(state.locs.map(l => ({ name: l.name, lat: l.lat, lon: l.lon })));
+      try { await navigator.clipboard.writeText(txt); $('#ipCopyHint').textContent = 'Kopyalandı — Claude sohbetine yapıştır.'; }
+      catch { $('#ipCopyHint').textContent = txt; }
+    });
     $('#ipProxy').addEventListener('change', e => {
       state.ipProxy = e.target.value.trim(); store.set('ipProxy', state.ipProxy); memCache.clear();
       if (state.source === 'infoplaza') refresh({ force: true });
@@ -692,6 +740,7 @@
     $('#srcSeg').addEventListener('click', e => {
       const v = e.target.dataset.v; if (!v) return;
       state.source = v; store.set('source', v); syncSrc(); renderModels(); refresh({ force: true });
+      if (v === 'infoplaza') showIpStatus();
     });
     $('#ipKey').addEventListener('change', e => {
       state.ipKey = e.target.value.trim(); store.set('ipKey', state.ipKey); memCache.clear();
@@ -707,7 +756,7 @@
         const d = await fetchInfoplaza(loc);
         const f = d.hours[0], l = d.hours[d.hours.length - 1];
         const fmt = v => v == null ? '–' : Math.round(v * 10) / 10;
-        out.textContent = `✓ Bağlantı tamam — ${d.hours.length} saatlik veri\n` +
+        out.textContent = `✓ ${d.hours.length} saatlik Infoplaza verisi\n` +
           `${new Date(f.t).toLocaleString('tr-TR')} → ${new Date(l.t).toLocaleString('tr-TR')}\n` +
           `İlk saat: rüzgar ${fmt(f.ws)} km/s, hamle ${fmt(f.wg)} km/s, yön ${fmt(f.wd)}°, ${fmt(f.temp)}°C, yağış ${fmt(f.precip)} mm`;
         memCache.clear(); if (state.source === 'infoplaza') refresh({ force: true });

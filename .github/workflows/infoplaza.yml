@@ -1,0 +1,36 @@
+name: Infoplaza verisi
+# Infoplaza tahminlerini çekip gh-pages'teki data/infoplaza/ klasörüne yazar.
+# Gerekli: repo Settings → Secrets and variables → Actions → INFOPLAZA_KEY
+# Her bölge ve her çalışma 3 Infoplaza kredisi harcar.
+on:
+  schedule:
+    - cron: '7 */3 * * *'   # 3 saatte bir (UTC)
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: infoplaza
+  cancel-in-progress: false
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Infoplaza'dan çek
+        env:
+          INFOPLAZA_KEY: ${{ secrets.INFOPLAZA_KEY }}
+        run: node scripts/fetch-infoplaza.mjs .
+      - name: Yayınla
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/infoplaza
+          git diff --cached --quiet && exit 0
+          git commit -m "Infoplaza verisi güncellendi"
+          git push
