@@ -230,7 +230,6 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 .fc td.ride.l0 span { background: #3ccf6e; }
 .fc td.ride.l1 span { background: #f2c037; }
 .fc td.ride.l2 span { background: #ef4d43; }
-.fc td.c.up { box-shadow: inset 0 -3px 0 rgba(0,0,0,.45); }
 
 /* Seçili bölge: daha büyük etiket + vurgu çerçevesi */
 .pin.sel .pill { font-size: 14px; line-height: 20px; box-shadow: 0 0 0 2px var(--accent), 0 2px 8px rgba(0,0,0,.5); }

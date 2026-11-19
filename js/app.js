@@ -309,46 +309,8 @@
     return data;
   }
 
-  // ---------- Motor modu: tüm kaynakların en yüksek hamlesi ----------
-  // Open-Meteo'dan GFS + ICON + ECMWF tek istekte, varsa Infoplaza da; her saat için en yüksek hamle.
-  async function getGustEnsemble(loc, { force = false } = {}) {
-    const key = `ens|${loc.lat},${loc.lon}`;
-    const c = memCache.get(key);
-    if (!force && c && Date.now() - c.at < CACHE_MS) return c.data;
-    const byT = new Map();
-    const add = (t, src, g) => {
-      if (g == null || !isFinite(g)) return;
-      const e = byT.get(t) || {};
-      e[src] = g; byT.set(t, e);
-    };
-    const models = { GFS: 'gfs_seamless', ICON: 'icon_seamless', ECMWF: 'ecmwf_ifs025' };
-    const jobs = [
-      fetch(`https://api.open-meteo.com/v1/forecast?${new URLSearchParams({
-        latitude: loc.lat, longitude: loc.lon, hourly: 'wind_gusts_10m', models: Object.values(models).join(','),
-        forecast_days: FORECAST_DAYS, wind_speed_unit: 'kmh', timeformat: 'unixtime',
-      })}`, { cache: 'no-store' }).then(r => r.json()).then(j => {
-        const h = j.hourly;
-        for (const [name, m] of Object.entries(models)) (h[`wind_gusts_10m_${m}`] || []).forEach((g, i) => add(h.time[i] * 1000, name, g));
-      }),
-      fetchInfoplazaFromSite(loc).then(d => d.hours.forEach(r => add(r.t, 'Infoplaza', r.wg))),
-    ];
-    await Promise.allSettled(jobs);
-    memCache.set(key, { at: Date.now(), data: byT });
-    return byT;
-  }
-  function applyGustEnsemble(data, ens) {
-    return {
-      ...data,
-      hours: data.hours.map(h => {
-        const e = { ...(ens.get(h.t) || {}) };
-        if (h.wg != null) e[data.source === 'Infoplaza' ? 'Infoplaza' : MODELS.find(m => m.id === state.model).label] ??= h.wg;
-        const vals = Object.entries(e);
-        if (!vals.length) return h;
-        const [src, g] = vals.reduce((a, b) => (b[1] > a[1] ? b : a));
-        return { ...h, wgBase: h.wg, wg: g, wgSrc: src, wgAll: e };
-      }),
-    };
-  }
+  // ---------- Motor modu: yalnızca sürüş durumu işaretleri ----------
+  // Veriye dokunmaz; seçili modelin rüzgar/hamle/yağış/sıcaklık değerlerinden hesaplanır.
   // Sürüş durumu: 2 = riskli, 1 = dikkat, 0 = uygun
   function rideLevel(r) {
     const g = r.wg ?? 0, p = r.precipH ?? 0;
@@ -358,7 +320,7 @@
   }
   function rideWhy(r) {
     const w = [];
-    if ((r.wg ?? 0) >= state.motorWarn) w.push(`hamle ${windVal(r.wg)} ${unitLabel()}${r.wgSrc ? ' (' + r.wgSrc + ')' : ''}`);
+    if ((r.wg ?? 0) >= state.motorWarn) w.push(`hamle ${windVal(r.wg)} ${unitLabel()}`);
     if ((r.precipH ?? 0) >= 0.2) w.push(`yağış ${(r.precip ?? 0).toFixed(1)} mm`);
     if (r.temp != null && Math.round(r.temp) <= 3) w.push(`soğuk ${Math.round(r.temp)}°C (buzlanma)`);
     return w.join(', ') || 'uygun';
@@ -526,11 +488,10 @@
 
   // Tüm bölgelerin verisini çek (işaret ve rozetler için)
   async function loadAll({ force = false } = {}) {
-    // Motor modunda harita etiketleri de tablodaki gibi tüm kaynakların en yüksek hamlesini gösterir
     await Promise.all(state.locs.map(async l => {
       try {
         const d = await getForecast(l, state.model, { force });
-        l._data = state.motor ? applyGustEnsemble(d, await getGustEnsemble(l, { force })) : d;
+        l._data = d;
       } catch { l._data = null; }
     }));
     paintBadges();
@@ -587,12 +548,7 @@
       const data = await getForecast(loc, state.model, { force });
       if (reqId !== load.req) return;
       const model = MODELS.find(m => m.id === state.model);
-      let shown = data;
-      if (state.motor) {
-        const ens = await getGustEnsemble(loc, { force });
-        if (reqId !== load.req) return;
-        shown = applyGustEnsemble(data, ens);
-      }
+      const shown = data;  // tüm değerler seçili modelden
       loc._data = shown;   // harita etiketi tabloyla aynı veriyi kullansın
       state.rows = buildRows(shown, loc);
       state.days = [];
@@ -691,11 +647,7 @@
     row(icoSun, (r, i) => `<td class="${cls(i, 'icon')}">${weatherIcon(r)}</td>`);
     row(icoDir, (r, i) => `<td class="${cls(i, 'dir')}" title="${Math.round(r.wd)}°">${arrow(r.wd)}</td>`);
     row(`${unitLabel()}<br><small>rüzgar</small>`, (r, i) => `<td class="${cls(i, 'c')}" style="background:${windColor(r.ws)}">${windVal(r.ws)}</td>`);
-    row(`${unitLabel()}<br><small>${state.motor ? 'hamle▲' : 'hamle'}</small>`, (r, i) => {
-      const up = state.motor && r.wgBase != null && r.wg - r.wgBase >= 3;
-      const tip = r.wgAll ? Object.entries(r.wgAll).map(([k, v]) => `${k} ${windVal(v)}`).join(' · ') : '';
-      return `<td class="${cls(i, 'c' + (up ? ' up' : ''))}" style="background:${windColor(r.wg)}"${tip ? ` title="${tip}"` : ''}>${windVal(r.wg)}</td>`;
-    });
+    row(`${unitLabel()}<br><small>hamle</small>`, (r, i) => `<td class="${cls(i, 'c')}" style="background:${windColor(r.wg)}">${windVal(r.wg)}</td>`);
     if (state.motor) {
       const icoMoto = '<svg viewBox="0 0 24 24"><circle cx="5.5" cy="16.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="18.5" cy="16.5" r="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 16.5l4-7h5l4 7M14 9.5l-1.5-3H15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
       row(icoMoto, (r, i) => { const lv = rideLevel(r); return `<td class="${cls(i, 'ride l' + lv)}" title="${rideWhy(r)}"><span></span></td>`; });
@@ -830,7 +782,7 @@
       syncSeg('motorSeg', state.motor ? 'on' : 'off');
       $('#mWarn').value = state.motorWarn; $('#mRisk').value = state.motorRisk;
     };
-    const setMotor = on => { state.motor = on; store.set('motor', on); syncMotor(); refresh(); };
+    const setMotor = on => { state.motor = on; store.set('motor', on); syncMotor(); load(); };
     $('#motorSeg').addEventListener('click', e => { const v = e.target.dataset.v; if (v) setMotor(v === 'on'); });
     ['mWarn', 'mRisk'].forEach(id => $('#' + id).addEventListener('change', () => {
       const w = +$('#mWarn').value, r = +$('#mRisk').value;
