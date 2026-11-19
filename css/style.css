@@ -195,3 +195,4 @@ dialog.sheet::backdrop { background: rgba(0,0,0,.5); }
 .ip-out.err { color: #ff8f80; }
 .hint code { background: var(--bg2); padding: 0 4px; border-radius: 4px; }
 .source .warn { color: #ffb36b; }
+.fld { display: block; font-size: 13px; color: var(--muted); }

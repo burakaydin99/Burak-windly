@@ -117,11 +117,15 @@
         Infoplaza Platform hesabındaki <b>api_key</b>'i gir. Veriler Infoplaza'nın <b>Optimal</b> modelinden, 7 gün saatlik olarak gelir
         (<code>/v1/weather/forecast</code>). Her bölge için yenileme başına 3 kredi harcanır; veriler 30 dk önbellekte tutulur.
       </p>
+      <label class="fld" for="ipProxy">Aracı sunucu (Cloudflare Worker) adresi</label>
+      <input id="ipProxy" type="url" placeholder="https://infoplaza-proxy.….workers.dev" autocomplete="off" spellcheck="false">
+      <p class="hint">
+        Infoplaza tarayıcıdan doğrudan çağrılmaya izin vermediği için istekler bu aracı sunucudan geçer.
+        Kurulum adımları ve kod: <a href="https://github.com/burakaydin99/Burak-windly/blob/gh-pages/proxy/infoplaza-worker.js" target="_blank" rel="noopener">infoplaza-worker.js</a>.
+        api_key'i Worker'a gizli değişken olarak girdiysen aşağıdaki alanı boş bırakabilirsin.
+      </p>
+      <label class="fld" for="ipKey">api_key (Worker'da tanımlıysa boş bırak)</label>
       <input id="ipKey" type="password" placeholder="api_key" autocomplete="off" spellcheck="false">
-      <button class="btn primary" id="ipTest">Bağlantıyı test et</button>
-      <pre class="ip-out" id="ipOut" hidden></pre>
-      <p class="hint">Infoplaza'dan veri alınamazsa uygulama otomatik olarak Open-Meteo'ya geçer ve bunu üstte belirtir.</p>
-    </div>
       <button class="btn primary" id="ipTest">Bağlantıyı test et</button>
       <pre class="ip-out" id="ipOut" hidden></pre>
       <p class="hint">Infoplaza'dan veri alınamazsa uygulama otomatik olarak Open-Meteo'ya geçer ve bunu üstte belirtir.</p>

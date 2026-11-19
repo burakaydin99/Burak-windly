@@ -32,6 +32,22 @@ Windy / Windguru tarzı, telefona uygun bir rüzgar tahmin uygulaması.
 
 Yenile'ye basıldığında tüm kayıtlı bölgelerin 7 günlük tahmini yeniden alınır. İnternet yoksa en son çekilen veri “çevrimdışı” etiketiyle gösterilir. Kayıtlı bölgeler, ayarlar ve token tarayıcıda (localStorage) saklanır.
 
+### Infoplaza aracı sunucusu (Cloudflare Worker)
+
+Infoplaza API'si tarayıcıdan doğrudan çağrılmaya izin vermiyor (CORS). Bu yüzden istekler ücretsiz bir Cloudflare Worker üzerinden geçer. Kod: [`proxy/infoplaza-worker.js`](proxy/infoplaza-worker.js).
+
+1. https://dash.cloudflare.com adresinde ücretsiz bir hesap aç.
+2. **Workers & Pages → Create → Worker** yolunu izle. Adı örneğin `infoplaza-proxy` olsun, sonra **Deploy**'a bas.
+3. **Edit code**'a bas, `infoplaza-worker.js` içeriğini yapıştır ve **Deploy**'a bas.
+4. **Settings → Variables and Secrets → Add** yolunu izle. Tür **Secret**, ad `INFOPLAZA_KEY`, değer api_key olsun. Sonra **Deploy**'a bas.
+5. Worker adresini (`https://infoplaza-proxy.<ad>.workers.dev`) uygulamada Ayarlar → Infoplaza → **Aracı sunucu adresi** alanına yapıştır. api_key alanı boş kalabilir.
+
+Worker sadece `burakaydin99.github.io` adresinden gelen istekleri kabul eder. Aynı isteği 10 dakika önbellekte tutar, böylece aynı istek tekrar geldiğinde kredi harcanmaz.
+
+## Yayın
+
+Uygulama `gh-pages` dalından GitHub Pages ile yayınlanır: https://burakaydin99.github.io/Burak-windly/
+
 ## Çalıştırma
 
 Build adımı yoktur, statik dosyalardan oluşur:
