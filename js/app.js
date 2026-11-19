@@ -424,7 +424,7 @@
   function fitAll(animate = true) {
     if (!map) return;
     const ls = state.locs;
-    if (ls.length > 1) map.fitBounds(L.latLngBounds(ls.map(l => [l.lat, l.lon])), { padding: [60, 60], maxZoom: 12, animate });
+    if (ls.length > 1) map.fitBounds(L.latLngBounds(ls.map(l => [l.lat, l.lon])), { padding: [80, 80], maxZoom: 12, animate });
     else if (ls.length) map.setView([ls[0].lat, ls[0].lon], 12, { animate });
     else map.setView([39.0, 35.0], 5);
   }
@@ -438,10 +438,6 @@
 
   function compassSvg(r) {
     const cx = 70, cy = 70;
-    const rad = (r.wd - 90) * Math.PI / 180;
-    const px = cx + Math.cos(rad) * 38, py = cy + Math.sin(rad) * 38;
-    const txt = `${windVal(r.ws)} ${unitLabel()}`;
-    const w = txt.length * 7.4 + 14;
     const dk = mapIsDark();
     const ring = dk ? '#cfd8e0' : '#555', face = dk ? 'rgba(10,20,30,.45)' : 'rgba(255,255,255,.35)', ink = dk ? '#fff' : '#333';
     return `<svg viewBox="0 0 140 140" width="140" height="140">
@@ -454,10 +450,6 @@
         <path d="M70 32l-8 12h16z" fill="${ink}"/>
       </g>
       <circle cx="70" cy="70" r="7" fill="#fff" stroke="${ring}" stroke-width="2"/>
-      <g transform="translate(${px} ${py})">
-        <rect x="${-w / 2}" y="-11" width="${w}" height="22" rx="11" fill="${windColor(r.ws)}" stroke="rgba(0,0,0,.35)"/>
-        <text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="#111" font-family="system-ui">${txt}</text>
-      </g>
     </svg>`;
   }
 
@@ -479,11 +471,21 @@
     }
     renderCompass();
   }
+  // Şiddet: 0 yeşil, 1 sarı, 2 kırmızı (km/s). Hamle eşikleri Motor modu ayarlarıyla aynı.
+  const sevWind = v => v == null ? -1 : v >= 35 ? 2 : v >= 20 ? 1 : 0;
+  const sevGust = v => v == null ? -1 : v >= state.motorRisk ? 2 : v >= state.motorWarn ? 1 : 0;
+  // Haritadaki etiket: [rüzgar | yön | hamle]
+  function windPill(r) {
+    if (!r) return '<span class="pill"><span class="pw s-1">…</span></span>';
+    return `<span class="pill" title="rüzgar ${windVal(r.ws)} · hamle ${windVal(r.wg)} ${unitLabel()}">` +
+      `<span class="pw s${sevWind(r.ws)}">${windVal(r.ws)}</span>` +
+      `<span class="pd">${arrow(r.wd, 13)}</span>` +
+      `<span class="pg s${sevGust(r.wg)}">${windVal(r.wg)}</span></span>`;
+  }
   function pinIcon(l, r) {
-    const val = r ? `${arrow(r.wd, 16)}${windVal(r.ws)}` : '…';
     return L.divIcon({
       className: 'pin-wrap', iconSize: null,
-      html: `<div class="pin"><span class="pv" style="background:${r ? windColor(r.ws) : '#ddd'}">${val}</span><span class="pn">${esc(l.name)}</span></div>`,
+      html: `<div class="pin">${windPill(r)}<span class="pn">${esc(l.name)}</span></div>`,
     });
   }
   function renderCompass() {
@@ -491,7 +493,7 @@
     const l = curLoc();
     const r = l?._r;
     if (!l || !r) { if (compassMk) { map.removeLayer(compassMk); compassMk = null; } return; }
-    const icon = L.divIcon({ className: 'compass-mk', iconSize: [140, 140], iconAnchor: [70, 70], html: compassSvg(r) + `<span class="pn">${esc(l.name)}</span>` });
+    const icon = L.divIcon({ className: 'compass-mk', iconSize: [140, 140], iconAnchor: [70, 70], html: compassSvg(r) + `<div class="cpill">${windPill(r)}</div><span class="pn">${esc(l.name)}</span>` });
     if (!compassMk) compassMk = L.marker([l.lat, l.lon], { icon, interactive: false, zIndexOffset: -100 }).addTo(map);
     else { compassMk.setLatLng([l.lat, l.lon]); compassMk.setIcon(icon); }
   }

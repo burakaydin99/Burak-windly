@@ -68,19 +68,27 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* Haritadaki bölge işaretleri */
 .pin-wrap { background: none; border: 0; }
 .pin { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; cursor: pointer; }
-.pin .pv {
-  display: flex; align-items: center; gap: 2px; padding: 1px 6px 1px 3px; border-radius: 6px;
-  font: 700 12px system-ui, sans-serif; color: #111; border: 1.5px solid rgba(0,0,0,.35); box-shadow: 0 1px 4px rgba(0,0,0,.3);
-  background: #ccc; white-space: nowrap;
+/* Rüzgar etiketi: [rüzgar | yön | hamle], her yarı kendi şiddet rengiyle */
+.pill {
+  display: inline-flex; align-items: stretch; border-radius: 999px; overflow: hidden; white-space: nowrap;
+  font: 700 12px/16px system-ui, sans-serif; color: #111; border: 1.5px solid rgba(0,0,0,.45); box-shadow: 0 1px 4px rgba(0,0,0,.35);
 }
-.pin .pv svg { width: 14px; height: 14px; color: #111; }
+.pill > span { display: flex; align-items: center; padding: 1px 6px; }
+.pill .pd { padding: 1px 2px; background: #fff; color: #111; }
+.pill .pd svg { width: 13px; height: 13px; }
+.pill .s0 { background: #3ccf6e; }
+.pill .s1 { background: #f2c037; }
+.pill .s2 { background: #ef4d43; color: #fff; }
+.pill .s-1 { background: #ccd3da; }
+.mapwrap.dark .pill .pd { background: #1e2329; color: #fff; }
+.compass-mk .cpill { position: absolute; left: 70px; top: 90px; transform: translateX(-50%); }
 .pin .pn {
   margin-top: 1px; font: 600 11px system-ui, sans-serif; color: #1b2733; white-space: nowrap;
   text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
 }
 .compass-mk { background: none; border: 0; pointer-events: none; }
 .compass-mk .pn {
-  position: absolute; left: 70px; top: 146px; transform: translateX(-50%); white-space: nowrap;
+  position: absolute; left: 70px; top: 142px; transform: translateX(-50%); white-space: nowrap;
   font: 700 13px system-ui, sans-serif; color: #1b2733; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
 }
 .pick-banner {
