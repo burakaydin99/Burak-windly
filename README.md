@@ -12,7 +12,7 @@ Windy / Windguru tarzı, telefona uygun bir rüzgar tahmin uygulaması.
   - **rüzgar** ve **hamle (peak)** hızı (renk skalalı)
   - **sıcaklık**
   - **yağış (mm)**
-  - nem
+  - yağış olasılığı (%)
 - **Ayarlar**:
   - birim (km/s, knot, m/sn, Bft)
   - zaman adımı (1 veya 3 saat)

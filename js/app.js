@@ -178,7 +178,7 @@
   async function fetchOpenMeteo(loc, model) {
     const q = new URLSearchParams({
       latitude: loc.lat, longitude: loc.lon,
-      hourly: 'temperature_2m,relative_humidity_2m,precipitation,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
+      hourly: 'temperature_2m,precipitation,precipitation_probability,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m',
       models: model.om, forecast_days: FORECAST_DAYS, wind_speed_unit: 'kmh', timeformat: 'unixtime', timezone: 'auto',
     });
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?${q}`, { cache: 'no-store' });
@@ -192,7 +192,7 @@
     const hours = h.time.map((t, i) => ({
       t: t * 1000,
       ws: h.wind_speed_10m[i], wg: h.wind_gusts_10m?.[i], wd: h.wind_direction_10m[i],
-      temp: h.temperature_2m[i], precip: h.precipitation?.[i], cloud: h.cloud_cover?.[i], rh: h.relative_humidity_2m?.[i],
+      temp: h.temperature_2m[i], precip: h.precipitation?.[i], cloud: h.cloud_cover?.[i], pp: h.precipitation_probability?.[i],
     })).filter(r => r.ws != null && r.temp != null);
     return { hours, tz: j.timezone, source: 'Open-Meteo' };
   }
@@ -201,7 +201,7 @@
   // ---------- Infoplaza Platform Weather API ----------
   // GET https://api.infoplaza.com/v1/weather/forecast — Infoplaza "Optimal" modeli, 7 gün saatlik.
   // hourly[]: time (unix sn), windSpeed / windGust (m/sn, units=metric), windBearing (°),
-  // temperature (°C), precipIntensity (mm/saat), cloudCover (0–1), humidity (0–1).
+  // temperature (°C), precipIntensity (mm/saat), precipProbability (0–1), cloudCover (0–1).
   // Not: 48 saatten uzun tahmin istek başına 3 kredi harcar.
   // Infoplaza tarayıcıdan doğrudan çağrıya (CORS) izin vermediği için istekler
   // kullanıcının Cloudflare Worker aracı sunucusundan geçer (proxy/infoplaza-worker.js).
@@ -229,7 +229,7 @@
       temp: n(h.temperature),
       precip: n(h.precipIntensity),          // saatlik adımda mm/saat ≈ o saatin toplamı
       cloud: n(h.cloudCover) != null ? h.cloudCover * 100 : null,
-      rh: n(h.humidity) != null ? h.humidity * 100 : null,
+      pp: n(h.precipProbability) != null ? h.precipProbability * 100 : null,
     })).filter(r => r.ws != null && r.t).sort((a, b) => a.t - b.t);
     return { hours, tz: typeof d.timezone === 'string' ? d.timezone : null, source: 'Infoplaza' };
   }
@@ -373,16 +373,18 @@
       const r = hrs[i];
       const p = tparts(r.t, loc.tz);
       if (step > 1 && p.h % step !== 0) continue;
-      let wg = r.wg, precip = r.precip;
+      let wg = r.wg, precip = r.precip, pp = r.pp;
       if (step > 1) {
         const win = hrs.slice(Math.max(0, i - step + 1), i + 1).filter(x => x.t > r.t - step * 3600e3);
         const gs = win.map(x => x.wg).filter(x => x != null);
         if (gs.length) wg = Math.max(...gs);
         precip = win.reduce((s, x) => s + (x.precip || 0), 0);
+        const ps = win.map(x => x.pp).filter(x => x != null);   // pencere içindeki en yüksek olasılık
+        if (ps.length) pp = Math.max(...ps);
       }
       const sun = sunTimes(r.t, loc.lat, loc.lon);
       const day = sun ? (r.t > sun.rise && r.t < sun.set) : true;
-      out.push({ ...r, wg, precip, precipH: precip != null ? precip / step : null, p, day });
+      out.push({ ...r, wg, precip, pp, precipH: precip != null ? precip / step : null, p, day });
     }
     return out;
   }
@@ -691,7 +693,7 @@
     };
     const icoSun = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
     const icoDir = '<svg viewBox="0 0 24 24"><path d="M6 18L18 6M18 6h-8M18 6v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-    const icoDrop = '<svg viewBox="0 0 24 24"><path d="M12 3s6 7 6 11a6 6 0 0 1-12 0c0-4 6-11 6-11z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+    const icoUmb = '<svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 18 0H3zM12 12v6.5a2 2 0 0 1-4 0" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
     row(icoSun, (r, i) => `<td class="${cls(i, 'icon')}">${weatherIcon(r)}</td>`);
     row(icoDir, (r, i) => `<td class="${cls(i, 'dir')}" title="${Math.round(r.wd)}°">${arrow(r.wd)}</td>`);
@@ -712,7 +714,12 @@
       const txt = p == null ? '–' : p < 0.1 ? '0' : p < 10 ? p.toFixed(1) : Math.round(p);
       return `<td class="${cls(i, 'rain' + c)}">${txt}</td>`;
     });
-    row(icoDrop + '<small>%</small>', (r, i) => `<td class="${cls(i, 'rh')}">${r.rh != null ? Math.round(r.rh) + '%' : '–'}</td>`);
+    // Yağış olasılığı: %30+ açık mavi, %60+ koyu mavi
+    row(icoUmb + '<small>%</small>', (r, i) => {
+      const v = r.pp;
+      const c = v == null ? '' : v >= 60 ? ' p2' : v >= 30 ? ' p1' : '';
+      return `<td class="${cls(i, 'pp' + c)}" title="Yağış olasılığı">${v != null ? Math.round(v) + '%' : '–'}</td>`;
+    });
     h += '</tbody></table>';
     fc.innerHTML = h;
 
